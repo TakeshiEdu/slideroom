@@ -40,7 +40,7 @@ import { useAppStore } from "./stores/useAppStore";
 import type { ExportFormat, ExportSettings, Room, RoomMember, SlideItem, SubmittedFile } from "./types";
 import { formatFileSize } from "./utils/format";
 
-type AppPage = "home" | "login" | "register" | "forgot" | "account" | "create" | "join" | "room" | "order" | "preview";
+type AppPage = "home" | "login" | "register" | "check-email" | "forgot" | "account" | "create" | "join" | "room" | "order" | "preview";
 
 interface AppRoute {
   page: AppPage;
@@ -53,6 +53,7 @@ function parseHash(): AppRoute {
   const parts = raw.split("/").filter(Boolean);
   if (parts[0] === "login") return { page: "login" };
   if (parts[0] === "register") return { page: "register" };
+  if (parts[0] === "check-email") return { page: "check-email" };
   if (parts[0] === "forgot") return { page: "forgot" };
   if (parts[0] === "account") return { page: "account" };
   if (parts[0] === "create") return { page: "create" };
@@ -110,6 +111,7 @@ function App() {
       {route.page === "home" && <HomePage room={selectedRoom} />}
       {route.page === "login" && <LoginPage />}
       {route.page === "register" && <RegisterPage />}
+      {route.page === "check-email" && <CheckEmailPage />}
       {route.page === "forgot" && <ForgotPasswordPage />}
       {route.page === "account" && (authReady && isAuthenticated ? <AccountPage /> : <LoginPage />)}
       {route.page === "create" && (authReady && isAuthenticated ? <CreateRoomPage /> : <RegisterPage />)}
@@ -180,9 +182,10 @@ function RegisterPage() {
     if (!agreed) return toast.error("利用規約への同意をチェックしてください。");
     setSubmitting(true);
     try {
-      const user = await register({ name, email, password });
-      toast.success(user?.emailVerified ? "登録しました。" : "確認メールを送信しました。メール認証後にログインしてください。");
-      navigate(user?.emailVerified ? "/create" : "/login");
+      await register({ name, email, password });
+      window.sessionStorage.setItem("slideroom.pendingSignupEmail", email.trim());
+      toast.success("確認メールを送信しました。メール内のリンクを開いてください。");
+      navigate("/check-email");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "登録できませんでした。");
     } finally {
@@ -228,6 +231,36 @@ function RegisterPage() {
         <p className="auth-switch">すでにアカウントをお持ちですか？ <button type="button" onClick={() => navigate("/login")}>ログイン</button></p>
       </form>
       {termsOpen && <TermsModal onClose={() => setTermsOpen(false)} />}
+    </AuthPage>
+  );
+}
+
+function CheckEmailPage() {
+  const [email] = useState(() => window.sessionStorage.getItem("slideroom.pendingSignupEmail") ?? "");
+
+  return (
+    <AuthPage>
+      <section className="auth-form auth-form-card check-email-card">
+        <div className="auth-message-box">
+          <Mail size={34} />
+          <div>
+            <strong>メールを確認してください</strong>
+            <p>
+              {email ? `${email} 宛に確認メールを送信しました。` : "入力したメールアドレス宛に確認メールを送信しました。"}
+              メール内のリンクを開くと、アカウント認証が完了します。
+            </p>
+          </div>
+        </div>
+        <h1>確認メールを送りました</h1>
+        <p>メール認証が完了したら、ログイン画面からSlideRoomに入れます。</p>
+        <button className="wide-primary" type="button" onClick={() => navigate("/login")}>
+          確認したのでログインへ
+        </button>
+        <button className="outline-wide" type="button" onClick={() => navigate("/register")}>
+          メールアドレスを修正する
+        </button>
+        <small className="auth-help-text">メールが見つからない場合は、迷惑メールフォルダも確認してください。</small>
+      </section>
     </AuthPage>
   );
 }
@@ -479,18 +512,15 @@ function AccountPage() {
     updateAccountName,
     changePassword,
     resendEmailVerification,
-    verifyEmailCode,
   } = useAppStore();
   const [activeTab, setActiveTab] = useState<"settings" | "verification">("settings");
   const [name, setName] = useState(currentUser.name);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [verificationCode, setVerificationCode] = useState("");
-  const [codeSent, setCodeSent] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
   const [savingName, setSavingName] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
-  const [verifyingCode, setVerifyingCode] = useState(false);
 
   async function saveName(event: FormEvent) {
     event.preventDefault();
@@ -528,28 +558,12 @@ function AccountPage() {
     setSendingCode(true);
     try {
       await resendEmailVerification();
-      setCodeSent(true);
-      setVerificationCode("");
-      toast.success("認証コードを送信しました。");
+      setVerificationSent(true);
+      toast.success("確認メールを送信しました。メール内のリンクを開いてください。");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "認証コードを送信できませんでした。");
+      toast.error(error instanceof Error ? error.message : "確認メールを送信できませんでした。");
     } finally {
       setSendingCode(false);
-    }
-  }
-
-  async function verifyEmail(event: FormEvent) {
-    event.preventDefault();
-    if (!codeSent) return toast.error("先に認証コードを送信してください。");
-    if (!verificationCode.trim()) return toast.error("認証コードを入力してください。");
-    setVerifyingCode(true);
-    try {
-      await verifyEmailCode(verificationCode);
-      toast.success("メール認証が完了しました。");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "メール認証を完了できませんでした。");
-    } finally {
-      setVerifyingCode(false);
     }
   }
 
@@ -603,32 +617,21 @@ function AccountPage() {
           </>
         )}
         {activeTab === "verification" && (
-          <form className="account-card verification-card" onSubmit={verifyEmail}>
+          <section className="account-card verification-card">
             <h2><ShieldCheck size={23} /> メール認証</h2>
-            <p>メールに届いた認証コードを入力して、アカウントの本人確認を完了します。</p>
+            <p>メールに届いた確認リンクを開くと、アカウントの本人確認が完了します。</p>
             <div className={cx("verification-status", isEmailVerified && "is-verified")}>
               {isEmailVerified ? <Check size={22} /> : <Mail size={22} />}
               <div>
-                <strong>{isEmailVerified ? "認証済み" : codeSent ? "認証コード送信済み" : "未認証"}</strong>
+                <strong>{isEmailVerified ? "認証済み" : verificationSent ? "確認メール送信済み" : "未認証"}</strong>
                 <span>{currentUser.email ?? "メールアドレス未設定"}</span>
               </div>
             </div>
             <button className="outline-wide" type="button" onClick={sendVerificationCode} disabled={sendingCode || isEmailVerified}>
-              {isEmailVerified ? "認証済み" : sendingCode ? "送信中..." : codeSent ? "認証コードを再送信" : "認証コードを送信"}
+              {isEmailVerified ? "認証済み" : sendingCode ? "送信中..." : verificationSent ? "確認メールを再送信" : "確認メールを送信"}
             </button>
-            <label className="auth-field">
-              <span>メールに届いたパスコード</span>
-              <input
-                value={verificationCode}
-                onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
-                inputMode="numeric"
-                pattern="[0-9]*"
-                placeholder="6桁の認証コード"
-              />
-            </label>
-            <button className="wide-primary" type="submit" disabled={isEmailVerified || verifyingCode}>{isEmailVerified ? "認証済み" : verifyingCode ? "認証中..." : "認証する"}</button>
-            <small>メールが届かない場合は、迷惑メールフォルダを確認するか、時間を置いて再送信してください。</small>
-          </form>
+            <small>確認後はログインし直すと認証状態が反映されます。メールが届かない場合は、迷惑メールフォルダを確認するか、時間を置いて再送信してください。</small>
+          </section>
         )}
         <p className="account-note"><ShieldCheck size={20} /> ログイン情報とセッションは安全な認証基盤で管理されます。</p>
       </section>

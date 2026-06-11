@@ -113,17 +113,6 @@ export async function resendEmailVerification(email: string) {
   if (error) throw error;
 }
 
-export async function verifyEmailOtp(input: { email: string; token: string }) {
-  const { data, error } = await getSupabaseBrowserClient().auth.verifyOtp({
-    type: "signup",
-    email: input.email.trim().toLowerCase(),
-    token: input.token.trim(),
-  });
-  if (error) throw error;
-  if (!data.user) throw new Error("メール認証を完了できませんでした。");
-  return toUserProfile(data.user);
-}
-
 export function subscribeToAuthChanges(callback: (user: UserProfile | null) => void) {
   if (!isAuthConfigured()) return () => undefined;
 
@@ -135,4 +124,3 @@ export function subscribeToAuthChanges(callback: (user: UserProfile | null) => v
 
   return () => subscription.unsubscribe();
 }
-

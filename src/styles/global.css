@@ -358,6 +358,17 @@ button:disabled {
   color: var(--navy);
 }
 
+.check-email-card {
+  align-content: start;
+}
+
+.auth-help-text {
+  color: var(--muted);
+  font-weight: 800;
+  line-height: 1.65;
+  text-align: center;
+}
+
 .terms-modal {
   position: relative;
   display: grid;

@@ -21,7 +21,6 @@ import {
   subscribeToAuthChanges,
   updateAuthPassword,
   updateProfileName,
-  verifyEmailOtp,
 } from "../services/authService";
 import { deleteBlob, loadSharedState, saveBlob, saveSharedState } from "../services/storageService";
 import type {
@@ -72,7 +71,6 @@ interface AppState {
   changePassword: (input: { currentPassword?: string; newPassword: string }) => Promise<void>;
   requestPasswordReset: (email: string) => Promise<void>;
   resendEmailVerification: () => Promise<void>;
-  verifyEmailCode: (code: string) => Promise<void>;
   logout: () => Promise<void>;
   createRoom: (input: RoomInput) => Room;
   updateRoom: (roomId: string, patch: Partial<Room>) => void;
@@ -329,13 +327,6 @@ export const useAppStore = create<AppState>()(
         const email = get().currentUser.email;
         if (!email) throw new Error("メールアドレスが登録されていません。");
         await resendEmailVerification(email);
-      },
-
-      async verifyEmailCode(code) {
-        const email = get().currentUser.email;
-        if (!email) throw new Error("メールアドレスが登録されていません。");
-        const user = await verifyEmailOtp({ email, token: code });
-        set({ currentUser: user, isEmailVerified: Boolean(user.emailVerified), isAuthenticated: true });
       },
 
       async logout() {
