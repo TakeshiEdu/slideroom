@@ -328,7 +328,7 @@ button:disabled {
   color: var(--blue);
 }
 
-.mock-reset-box,
+.auth-message-box,
 .account-note {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -342,17 +342,17 @@ button:disabled {
   line-height: 1.65;
 }
 
-.mock-reset-box svg,
+.auth-message-box svg,
 .account-note svg {
   color: var(--blue);
 }
 
-.mock-reset-box p,
+.auth-message-box p,
 .account-note {
   margin: 0;
 }
 
-.mock-reset-box strong {
+.auth-message-box strong {
   display: block;
   margin-bottom: 4px;
   color: var(--navy);
@@ -461,6 +461,13 @@ button:disabled {
 
 .account-card h2 svg {
   color: var(--blue);
+}
+
+.account-card-help {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 800;
+  line-height: 1.6;
 }
 
 .account-tabs {
@@ -2303,7 +2310,7 @@ button:disabled {
     padding: 30px 22px;
   }
 
-  .mock-reset-box,
+  .auth-message-box,
   .account-note {
     grid-template-columns: 1fr;
   }

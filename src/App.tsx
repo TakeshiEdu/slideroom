@@ -89,9 +89,13 @@ function cx(...classes: Array<string | false | undefined>) {
 
 function App() {
   const route = useHashRoute();
-  const { rooms, selectedRoomId, syncFromServer, isAuthenticated } = useAppStore();
+  const { rooms, selectedRoomId, syncFromServer, initializeAuth, isAuthenticated, authReady } = useAppStore();
   const routeRoom = rooms.find((room) => room.id === route.roomId);
   const selectedRoom = routeRoom ?? rooms.find((room) => room.id === selectedRoomId) ?? rooms[0];
+
+  useEffect(() => {
+    void initializeAuth();
+  }, [initializeAuth]);
 
   useEffect(() => {
     void syncFromServer();
@@ -107,8 +111,8 @@ function App() {
       {route.page === "login" && <LoginPage />}
       {route.page === "register" && <RegisterPage />}
       {route.page === "forgot" && <ForgotPasswordPage />}
-      {route.page === "account" && (isAuthenticated ? <AccountPage /> : <LoginPage />)}
-      {route.page === "create" && (isAuthenticated ? <CreateRoomPage /> : <RegisterPage />)}
+      {route.page === "account" && (authReady && isAuthenticated ? <AccountPage /> : <LoginPage />)}
+      {route.page === "create" && (authReady && isAuthenticated ? <CreateRoomPage /> : <RegisterPage />)}
       {route.page === "join" && <JoinRoomPage inviteCode={route.inviteCode} />}
       {route.page === "room" && (routeRoom ? <RoomPage room={routeRoom} /> : <NotFoundPage />)}
       {route.page === "order" && (routeRoom ? <OrderPage room={routeRoom} /> : <NotFoundPage />)}
@@ -156,7 +160,7 @@ function HomePage({ room: _room }: { room?: Room }) {
 
 
 function RegisterPage() {
-  const { mockRegister } = useAppStore();
+  const { register } = useAppStore();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -165,24 +169,32 @@ function RegisterPage() {
   const [termsOpen, setTermsOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
     if (!name.trim()) return toast.error("ユーザーネームを入力してください。");
     if (!email.trim()) return toast.error("メールアドレスを入力してください。");
     if (!password) return toast.error("パスワードを入力してください。");
     if (password !== confirm) return toast.error("パスワード確認が一致しません。");
     if (!agreed) return toast.error("利用規約への同意をチェックしてください。");
-    mockRegister({ name, email, password });
-    toast.success("登録しました。");
-    navigate("/create");
+    setSubmitting(true);
+    try {
+      const user = await register({ name, email, password });
+      toast.success(user?.emailVerified ? "登録しました。" : "確認メールを送信しました。メール認証後にログインしてください。");
+      navigate(user?.emailVerified ? "/create" : "/login");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "登録できませんでした。");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
     <AuthPage>
       <form className="auth-form" onSubmit={submit}>
         <h1>新規登録</h1>
-        <p>アカウントを作成すると、ルームの保存やオンラインでの共有ができます。</p>
+        <p>アカウントを作成すると、ルームの保存やオンライン共有ができます。</p>
         <DataExpiryNotice />
         <label className="auth-field">
           <span>ユーザーネーム</span>
@@ -212,7 +224,7 @@ function RegisterPage() {
           <input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} />
           <span><button type="button" onClick={() => setTermsOpen(true)}>利用規約</button>に同意します</span>
         </label>
-        <button className="wide-primary" type="submit">登録する</button>
+        <button className="wide-primary" type="submit" disabled={submitting}>{submitting ? "登録中..." : "登録する"}</button>
         <p className="auth-switch">すでにアカウントをお持ちですか？ <button type="button" onClick={() => navigate("/login")}>ログイン</button></p>
       </form>
       {termsOpen && <TermsModal onClose={() => setTermsOpen(false)} />}
@@ -221,18 +233,26 @@ function RegisterPage() {
 }
 
 function LoginPage() {
-  const { mockLogin } = useAppStore();
+  const { login } = useAppStore();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
     if (!email.trim()) return toast.error("メールアドレスを入力してください。");
     if (!password) return toast.error("パスワードを入力してください。");
-    mockLogin({ email, password });
-    toast.success("ログインしました。");
-    navigate("/");
+    setSubmitting(true);
+    try {
+      await login({ email, password });
+      toast.success("ログインしました。");
+      navigate("/");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "ログインできませんでした。");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -255,7 +275,7 @@ function LoginPage() {
           onToggle={() => setShowPassword((value) => !value)}
           withIcon
         />
-        <button className="wide-primary" type="submit">ログイン</button>
+        <button className="wide-primary" type="submit" disabled={submitting}>{submitting ? "ログイン中..." : "ログイン"}</button>
         <div className="auth-divider"><span>または</span></div>
         <button className="outline-wide" type="button" onClick={() => navigate("/register")}>新規登録</button>
         <button className="auth-link" type="button" onClick={() => navigate("/forgot")}>パスワードを忘れた場合</button>
@@ -266,21 +286,31 @@ function LoginPage() {
 }
 
 function ForgotPasswordPage() {
+  const { requestPasswordReset } = useAppStore();
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
     if (!email.trim()) return toast.error("メールアドレスを入力してください。");
-    setSubmitted(true);
-    toast.success("再設定案内を表示しました。");
+    setSubmitting(true);
+    try {
+      await requestPasswordReset(email);
+      setSubmitted(true);
+      toast.success("パスワード再設定メールを送信しました。");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "再設定メールを送信できませんでした。");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
     <AuthPage compact>
       <form className="auth-form auth-form-card" onSubmit={submit}>
         <h1>パスワード再設定</h1>
-        <p>ローカル開発版のためメール送信は行いません。入力後、モックの案内を表示します。</p>
+        <p>登録済みのメールアドレスに、パスワード再設定用のリンクを送信します。</p>
         <label className="auth-field icon-field">
           <span>メールアドレス</span>
           <div>
@@ -289,15 +319,15 @@ function ForgotPasswordPage() {
           </div>
         </label>
         {submitted && (
-          <div className="mock-reset-box" role="status">
+          <div className="auth-message-box" role="status">
             <KeyRound size={24} />
             <div>
-              <strong>モック案内</strong>
-              <p>本番では再設定リンクをメール送信します。開発版ではログイン画面に戻り、任意のパスワードでログインできます。</p>
+              <strong>メールを送信しました</strong>
+              <p>届いたメールのリンクからパスワードを再設定してください。メールが見つからない場合は迷惑メールフォルダも確認してください。</p>
             </div>
           </div>
         )}
-        <button className="wide-primary" type="submit">再設定案内を表示</button>
+        <button className="wide-primary" type="submit" disabled={submitting}>{submitting ? "送信中..." : "再設定メールを送信"}</button>
         <button className="auth-link" type="button" onClick={() => navigate("/login")}>ログインに戻る</button>
       </form>
     </AuthPage>
@@ -317,7 +347,7 @@ function TermsModal({ onClose }: { onClose: () => void }) {
           </section>
           <section>
             <h3>2. データの保存期間</h3>
-            <p>ローカル開発版では、ルーム内のスライド、アップロードファイル、出力履歴は作成から24時間以内に自動削除されます。必要なファイルは早めに書き出してください。</p>
+            <p>ルーム内のスライド、アップロードファイル、出力履歴は作成から24時間以内に自動削除されます。必要なファイルは早めに書き出してください。</p>
           </section>
           <section>
             <h3>3. アップロード内容</h3>
@@ -328,8 +358,8 @@ function TermsModal({ onClose }: { onClose: () => void }) {
             <p>PPTX/PDFの結合やプレビューは簡易実装です。特殊な図形、アニメーション、壊れたファイルは表示や出力が崩れる場合があります。</p>
           </section>
           <section>
-            <h3>5. モック認証</h3>
-            <p>現在の登録、ログイン、パスワード再設定は開発用のモックであり、本人確認やメール送信は行いません。</p>
+            <h3>5. アカウント認証</h3>
+            <p>登録、ログイン、パスワード再設定、メール認証は、本人確認と不正利用防止のために利用します。</p>
           </section>
         </div>
         <button className="wide-primary" type="button" onClick={onClose}>閉じる</button>
@@ -434,7 +464,7 @@ function MyRoomsPage() {
           <Globe2 size={54} />
           <div>
             <strong>すべてのルームはアカウントに同期されています</strong>
-            <p>どのデバイスからでも、同じローカルサーバーに接続すれば最新のルームにアクセスできます。サーバー節約のため、ルーム内のデータは作成から24時間以内に自動削除されます。</p>
+            <p>どのデバイスからでも、ログインすれば最新のルームにアクセスできます。サーバー節約のため、ルーム内のデータは作成から24時間以内に自動削除されます。</p>
           </div>
         </section>
       </section>
@@ -443,48 +473,84 @@ function MyRoomsPage() {
 }
 
 function AccountPage() {
-  const { currentUser, updateAccountName, mockChangePassword } = useAppStore();
+  const {
+    currentUser,
+    isEmailVerified,
+    updateAccountName,
+    changePassword,
+    resendEmailVerification,
+    verifyEmailCode,
+  } = useAppStore();
   const [activeTab, setActiveTab] = useState<"settings" | "verification">("settings");
   const [name, setName] = useState(currentUser.name);
-  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
-  const [isVerified, setIsVerified] = useState(false);
+  const [savingName, setSavingName] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
+  const [verifyingCode, setVerifyingCode] = useState(false);
 
-  function saveName(event: FormEvent) {
+  async function saveName(event: FormEvent) {
     event.preventDefault();
     if (!name.trim()) return toast.error("ユーザー名を入力してください。");
-    updateAccountName(name);
-    toast.success("ユーザー名を更新しました。");
+    setSavingName(true);
+    try {
+      await updateAccountName(name);
+      toast.success("ユーザー名を更新しました。");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "ユーザー名を更新できませんでした。");
+    } finally {
+      setSavingName(false);
+    }
   }
 
-  function savePassword(event: FormEvent) {
+  async function savePassword(event: FormEvent) {
     event.preventDefault();
-    if (!currentPassword) return toast.error("現在のパスワードを入力してください。");
     if (!newPassword) return toast.error("新しいパスワードを入力してください。");
     if (newPassword !== confirmPassword) return toast.error("確認用パスワードが一致しません。");
-    mockChangePassword({ currentPassword, newPassword });
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
-    toast.success("パスワードを更新しました。現在はモック保存です。");
+    setSavingPassword(true);
+    try {
+      await changePassword({ newPassword });
+      setNewPassword("");
+      setConfirmPassword("");
+      toast.success("パスワードを更新しました。");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "パスワードを更新できませんでした。");
+    } finally {
+      setSavingPassword(false);
+    }
   }
 
-  function sendVerificationCode() {
-    setCodeSent(true);
-    setIsVerified(false);
-    setVerificationCode("");
-    toast.success("認証コードを送信した想定です。開発版では 123456 を入力してください。");
+  async function sendVerificationCode() {
+    if (!currentUser.email) return toast.error("メールアドレスが登録されていません。");
+    setSendingCode(true);
+    try {
+      await resendEmailVerification();
+      setCodeSent(true);
+      setVerificationCode("");
+      toast.success("認証コードを送信しました。");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "認証コードを送信できませんでした。");
+    } finally {
+      setSendingCode(false);
+    }
   }
 
-  function verifyEmail(event: FormEvent) {
+  async function verifyEmail(event: FormEvent) {
     event.preventDefault();
     if (!codeSent) return toast.error("先に認証コードを送信してください。");
-    if (verificationCode.trim() !== "123456") return toast.error("認証コードが一致しません。開発版では 123456 です。");
-    setIsVerified(true);
-    toast.success("メール認証が完了しました。");
+    if (!verificationCode.trim()) return toast.error("認証コードを入力してください。");
+    setVerifyingCode(true);
+    try {
+      await verifyEmailCode(verificationCode);
+      toast.success("メール認証が完了しました。");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "メール認証を完了できませんでした。");
+    } finally {
+      setVerifyingCode(false);
+    }
   }
 
   return (
@@ -496,7 +562,7 @@ function AccountPage() {
           <span className="user-avatar large">{currentUser.name.trim().charAt(0) || "U"}</span>
           <div>
             <h1>マイページ</h1>
-            <p>ローカル開発版のアカウント設定です。認証処理はまだモックです。</p>
+            <p>アカウント情報、メール認証、パスワードを管理できます。</p>
           </div>
         </div>
         <div className="account-tabs" role="tablist" aria-label="アカウントメニュー">
@@ -519,14 +585,11 @@ function AccountPage() {
                 <span>メールアドレス</span>
                 <input value={currentUser.email ?? ""} readOnly placeholder="未設定" />
               </label>
-              <button className="wide-primary" type="submit">ユーザー名を保存</button>
+              <button className="wide-primary" type="submit" disabled={savingName}>{savingName ? "保存中..." : "ユーザー名を保存"}</button>
             </form>
             <form className="account-card" onSubmit={savePassword}>
               <h2><KeyRound size={23} /> パスワード変更</h2>
-              <label className="auth-field">
-                <span>現在のパスワード</span>
-                <input value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} type="password" placeholder="現在のパスワード" />
-              </label>
+              <p className="account-card-help">ログイン中のアカウントに新しいパスワードを設定します。</p>
               <label className="auth-field">
                 <span>新しいパスワード</span>
                 <input value={newPassword} onChange={(event) => setNewPassword(event.target.value)} type="password" placeholder="新しいパスワード" />
@@ -535,23 +598,23 @@ function AccountPage() {
                 <span>新しいパスワード確認</span>
                 <input value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} type="password" placeholder="もう一度入力" />
               </label>
-              <button className="wide-primary" type="submit">パスワードを更新</button>
+              <button className="wide-primary" type="submit" disabled={savingPassword}>{savingPassword ? "更新中..." : "パスワードを更新"}</button>
             </form>
           </>
         )}
         {activeTab === "verification" && (
           <form className="account-card verification-card" onSubmit={verifyEmail}>
             <h2><ShieldCheck size={23} /> メール認証</h2>
-            <p>本番ではメールで届いた6桁のパスコードを入力して、ルーム作成者の本人確認を行います。</p>
-            <div className={cx("verification-status", isVerified && "is-verified")}>
-              {isVerified ? <Check size={22} /> : <Mail size={22} />}
+            <p>メールに届いた認証コードを入力して、アカウントの本人確認を完了します。</p>
+            <div className={cx("verification-status", isEmailVerified && "is-verified")}>
+              {isEmailVerified ? <Check size={22} /> : <Mail size={22} />}
               <div>
-                <strong>{isVerified ? "認証済み" : codeSent ? "認証コード送信済み" : "未認証"}</strong>
+                <strong>{isEmailVerified ? "認証済み" : codeSent ? "認証コード送信済み" : "未認証"}</strong>
                 <span>{currentUser.email ?? "メールアドレス未設定"}</span>
               </div>
             </div>
-            <button className="outline-wide" type="button" onClick={sendVerificationCode}>
-              {codeSent ? "認証コードを再送信" : "認証コードを送信"}
+            <button className="outline-wide" type="button" onClick={sendVerificationCode} disabled={sendingCode || isEmailVerified}>
+              {isEmailVerified ? "認証済み" : sendingCode ? "送信中..." : codeSent ? "認証コードを再送信" : "認証コードを送信"}
             </button>
             <label className="auth-field">
               <span>メールに届いたパスコード</span>
@@ -563,11 +626,11 @@ function AccountPage() {
                 placeholder="6桁の認証コード"
               />
             </label>
-            <button className="wide-primary" type="submit" disabled={isVerified}>{isVerified ? "認証済み" : "認証する"}</button>
-            <small>ローカル開発版ではメール送信は行わず、確認コードは 123456 として扱います。</small>
+            <button className="wide-primary" type="submit" disabled={isEmailVerified || verifyingCode}>{isEmailVerified ? "認証済み" : verifyingCode ? "認証中..." : "認証する"}</button>
+            <small>メールが届かない場合は、迷惑メールフォルダを確認するか、時間を置いて再送信してください。</small>
           </form>
         )}
-        <p className="account-note"><ShieldCheck size={20} /> 本番では現在のパスワード確認、メール認証、セッション管理をサーバー側で行います。</p>
+        <p className="account-note"><ShieldCheck size={20} /> ログイン情報とセッションは安全な認証基盤で管理されます。</p>
       </section>
     </SimplePage>
   );
@@ -586,7 +649,7 @@ function MyRoomCard({ room, iconIndex }: { room: Room; iconIndex: number }) {
       </span>
       <span className={cx("room-state-pill", isOnline ? "is-online" : "is-local")}>
         {isOnline ? <Globe2 size={16} /> : <Monitor size={16} />}
-        {isOnline ? "オンライン共有中" : "ローカル"}
+        {isOnline ? "オンライン共有中" : "限定共有"}
       </span>
       <span className="room-card-menu">...</span>
     </button>

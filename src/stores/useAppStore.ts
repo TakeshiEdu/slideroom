@@ -11,6 +11,18 @@ import {
   seedSlides,
 } from "../data/seedData";
 import { analyzePptxBlob } from "../services/pptxAnalysisService";
+import {
+  getCurrentAuthUser,
+  requestPasswordResetEmail,
+  resendEmailVerification,
+  signInWithEmail,
+  signOut,
+  signUpWithEmail,
+  subscribeToAuthChanges,
+  updateAuthPassword,
+  updateProfileName,
+  verifyEmailOtp,
+} from "../services/authService";
 import { deleteBlob, loadSharedState, saveBlob, saveSharedState } from "../services/storageService";
 import type {
   AppSettings,
@@ -33,11 +45,12 @@ export type SortMode = "updated" | "deadline" | "title";
 type AppSettingsPatch = Partial<Omit<AppSettings, "notifications">> & {
   notifications?: Partial<AppSettings["notifications"]>;
 };
-const DEVICE_USER_KEY = "slideroom-device-user-v1";
 
 interface AppState {
   currentUser: UserProfile;
   isAuthenticated: boolean;
+  authReady: boolean;
+  isEmailVerified: boolean;
   rooms: Room[];
   members: RoomMember[];
   files: SubmittedFile[];
@@ -51,12 +64,16 @@ interface AppState {
   sortMode: SortMode;
   isUploading: boolean;
   isExporting: boolean;
+  initializeAuth: () => Promise<void>;
   syncFromServer: () => Promise<void>;
-  mockRegister: (input: { name: string; email: string; password: string }) => void;
-  mockLogin: (input: { email: string; password: string }) => void;
-  updateAccountName: (name: string) => void;
-  mockChangePassword: (input: { currentPassword: string; newPassword: string }) => void;
-  logout: () => void;
+  register: (input: { name: string; email: string; password: string }) => Promise<UserProfile | null>;
+  login: (input: { email: string; password: string }) => Promise<void>;
+  updateAccountName: (name: string) => Promise<void>;
+  changePassword: (input: { currentPassword?: string; newPassword: string }) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  resendEmailVerification: () => Promise<void>;
+  verifyEmailCode: (code: string) => Promise<void>;
+  logout: () => Promise<void>;
   createRoom: (input: RoomInput) => Room;
   updateRoom: (roomId: string, patch: Partial<Room>) => void;
   deleteRoom: (roomId: string) => void;
@@ -106,39 +123,32 @@ function now() {
   return new Date().toISOString();
 }
 
-function getDeviceUser() {
-  if (typeof window === "undefined") return currentUser;
+const signedOutUser: UserProfile = {
+  id: "signed-out-user",
+  name: "ゲスト",
+};
 
-  const raw = window.localStorage.getItem(DEVICE_USER_KEY);
-  if (raw) {
-    try {
-      return JSON.parse(raw) as UserProfile;
-    } catch {
-      window.localStorage.removeItem(DEVICE_USER_KEY);
-    }
-  }
+let authUnsubscribe: (() => void) | undefined;
 
-  const user: UserProfile = {
-    ...currentUser,
-    id: `user-${nanoid(8)}`,
-  };
-  window.localStorage.setItem(DEVICE_USER_KEY, JSON.stringify(user));
-  return user;
-}
-
-function createMockUser(input: { name?: string; email: string }) {
-  const email = input.email.trim().toLowerCase();
-  const fallbackName = email.split("@")[0] || "ユーザー";
-  return {
-    id: `user-${email.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48) || nanoid(8)}`,
-    name: input.name?.trim() || fallbackName,
-    email,
-  };
-}
-
-function saveDeviceUser(user: UserProfile) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(DEVICE_USER_KEY, JSON.stringify(user));
+function applyAuthenticatedUser(
+  user: UserProfile,
+  previousUserId: string,
+  set: (partial: Partial<AppState> | ((state: AppState) => Partial<AppState>)) => void,
+) {
+  set((state) => ({
+    currentUser: user,
+    isAuthenticated: true,
+    authReady: true,
+    isEmailVerified: Boolean(user.emailVerified),
+    rooms: state.rooms.map((room) =>
+      room.hostUserId === previousUserId ? { ...room, hostUserId: user.id } : room,
+    ),
+    members: state.members.map((member) =>
+      member.userId === previousUserId
+        ? { ...member, userId: user.id, name: user.name, isCurrentUser: true }
+        : { ...member, isCurrentUser: member.userId === user.id },
+    ),
+  }));
 }
 
 function updateRoomTimestamp(rooms: Room[], roomId: string) {
@@ -166,8 +176,10 @@ function buildSlidesForFile(file: SubmittedFile, existingSlides: SlideItem[]) {
 
 function baseState() {
   return {
-    currentUser: getDeviceUser(),
+    currentUser: signedOutUser,
     isAuthenticated: false,
+    authReady: false,
+    isEmailVerified: false,
     rooms: seedRooms,
     members: seedMembers,
     files: seedFiles,
@@ -209,6 +221,35 @@ export const useAppStore = create<AppState>()(
     (set, get) => ({
       ...baseState(),
 
+      async initializeAuth() {
+        if (authUnsubscribe) {
+          const user = await getCurrentAuthUser();
+          set({
+            currentUser: user ?? signedOutUser,
+            isAuthenticated: Boolean(user),
+            authReady: true,
+            isEmailVerified: Boolean(user?.emailVerified),
+          });
+          return;
+        }
+
+        const user = await getCurrentAuthUser();
+        if (user) {
+          applyAuthenticatedUser(user, get().currentUser.id, set);
+        } else {
+          set({ currentUser: signedOutUser, isAuthenticated: false, authReady: true, isEmailVerified: false });
+        }
+
+        authUnsubscribe = subscribeToAuthChanges((nextUser) => {
+          if (nextUser) {
+            applyAuthenticatedUser(nextUser, get().currentUser.id, set);
+            syncSharedState(get);
+          } else {
+            set({ currentUser: signedOutUser, isAuthenticated: false, authReady: true, isEmailVerified: false });
+          }
+        });
+      },
+
       async syncFromServer() {
         const snapshot = await loadSharedState<SharedAppSnapshot>();
         if (!snapshot) return;
@@ -240,52 +281,29 @@ export const useAppStore = create<AppState>()(
         });
       },
 
-      mockRegister(input) {
-        const user = createMockUser(input);
-        const previousUserId = get().currentUser.id;
-        saveDeviceUser(user);
-        set((state) => ({
-          currentUser: user,
-          isAuthenticated: true,
-          rooms: state.rooms.map((room) =>
-            room.hostUserId === previousUserId ? { ...room, hostUserId: user.id } : room,
-          ),
-          members: state.members.map((member) =>
-            member.userId === previousUserId
-              ? { ...member, userId: user.id, name: user.name, isCurrentUser: true }
-              : { ...member, isCurrentUser: member.userId === user.id },
-          ),
-        }));
+      async register(input) {
+        const user = await signUpWithEmail(input);
+        if (user) {
+          applyAuthenticatedUser(user, get().currentUser.id, set);
+          syncSharedState(get);
+        }
+        return user;
+      },
+
+      async login(input) {
+        const user = await signInWithEmail(input);
+        applyAuthenticatedUser(user, get().currentUser.id, set);
         syncSharedState(get);
       },
 
-      mockLogin(input) {
-        const user = createMockUser(input);
-        const previousUserId = get().currentUser.id;
-        saveDeviceUser(user);
-        set((state) => ({
-          currentUser: user,
-          isAuthenticated: true,
-          rooms: state.rooms.map((room) =>
-            room.hostUserId === previousUserId ? { ...room, hostUserId: user.id } : room,
-          ),
-          members: state.members.map((member) =>
-            member.userId === previousUserId
-              ? { ...member, userId: user.id, name: user.name, isCurrentUser: true }
-              : { ...member, isCurrentUser: member.userId === user.id },
-          ),
-        }));
-        syncSharedState(get);
-      },
-
-      updateAccountName(name) {
+      async updateAccountName(name) {
         const nextName = name.trim();
         if (!nextName) return;
         const userId = get().currentUser.id;
-        const user = { ...get().currentUser, name: nextName };
-        saveDeviceUser(user);
+        const user = await updateProfileName(nextName);
         set((state) => ({
           currentUser: user,
+          isEmailVerified: Boolean(user.emailVerified),
           members: state.members.map((member) =>
             member.userId === userId ? { ...member, name: nextName } : member,
           ),
@@ -299,12 +317,30 @@ export const useAppStore = create<AppState>()(
         syncSharedState(get);
       },
 
-      mockChangePassword() {
-        saveDeviceUser(get().currentUser);
+      async changePassword(input) {
+        await updateAuthPassword(input.newPassword);
       },
 
-      logout() {
-        set({ isAuthenticated: false });
+      async requestPasswordReset(email) {
+        await requestPasswordResetEmail(email);
+      },
+
+      async resendEmailVerification() {
+        const email = get().currentUser.email;
+        if (!email) throw new Error("メールアドレスが登録されていません。");
+        await resendEmailVerification(email);
+      },
+
+      async verifyEmailCode(code) {
+        const email = get().currentUser.email;
+        if (!email) throw new Error("メールアドレスが登録されていません。");
+        const user = await verifyEmailOtp({ email, token: code });
+        set({ currentUser: user, isEmailVerified: Boolean(user.emailVerified), isAuthenticated: true });
+      },
+
+      async logout() {
+        await signOut();
+        set({ currentUser: signedOutUser, isAuthenticated: false, isEmailVerified: false });
       },
 
       createRoom(input) {
@@ -668,15 +704,13 @@ export const useAppStore = create<AppState>()(
       name: "slideroom-state-v1",
       merge: (persisted, current) => {
         const persistedState = persisted as Partial<AppState> | undefined;
-        const localUser = getDeviceUser();
         return {
           ...current,
           ...persistedState,
-          currentUser:
-            persistedState?.currentUser && persistedState.currentUser.id !== currentUser.id
-              ? persistedState.currentUser
-              : localUser,
-          isAuthenticated: persistedState?.isAuthenticated ?? false,
+          currentUser: signedOutUser,
+          isAuthenticated: false,
+          authReady: false,
+          isEmailVerified: false,
           settings: {
             ...defaultSettings,
             ...(persistedState?.settings ?? {}),
@@ -688,8 +722,6 @@ export const useAppStore = create<AppState>()(
         };
       },
       partialize: (state) => ({
-        currentUser: state.currentUser,
-        isAuthenticated: state.isAuthenticated,
         rooms: state.rooms,
         members: state.members,
         files: state.files,

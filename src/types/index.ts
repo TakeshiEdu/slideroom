@@ -9,6 +9,7 @@ export interface UserProfile {
   name: string;
   email?: string;
   avatarUrl?: string;
+  emailVerified?: boolean;
 }
 
 export interface Room {
