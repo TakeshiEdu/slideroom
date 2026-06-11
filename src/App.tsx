@@ -240,23 +240,26 @@ function CheckEmailPage() {
 
   return (
     <AuthPage>
-      <section className="auth-form auth-form-card check-email-card">
-        <div className="auth-message-box">
-          <Mail size={34} />
-          <div>
-            <strong>メールを確認してください</strong>
-            <p>
-              {email ? `${email} 宛に確認メールを送信しました。` : "入力したメールアドレス宛に確認メールを送信しました。"}
-              メール内のリンクを開くと、アカウント認証が完了します。
-            </p>
-          </div>
+      <section className="check-email-screen">
+        <div className="check-email-icon" aria-hidden="true">
+          <Mail size={64} />
         </div>
-        <h1>確認メールを送りました</h1>
-        <p>メール認証が完了したら、ログイン画面からSlideRoomに入れます。</p>
-        <button className="wide-primary" type="button" onClick={() => navigate("/login")}>
-          確認したのでログインへ
+        <p className="check-email-kicker">あと少しで登録完了です</p>
+        <h1>メールを確認してください</h1>
+        <p className="check-email-lead">
+          {email ? `${email} 宛に確認メールを送信しました。` : "入力したメールアドレス宛に確認メールを送信しました。"}
+          メール内の確認リンクを開くと、SlideRoomのアカウント認証が完了します。
+        </p>
+        <button className="check-email-primary" type="button" onClick={() => navigate("/login")}>
+          認証しました
         </button>
-        <button className="outline-wide" type="button" onClick={() => navigate("/register")}>
+        <p className="check-email-sub">メール認証が終わったら、このボタンからログインへ進んでください。</p>
+        <div className="check-email-steps" aria-label="メール認証の手順">
+          <span>1. メールを開く</span>
+          <span>2. 確認リンクを押す</span>
+          <span>3. 下のボタンを押す</span>
+        </div>
+        <button className="check-email-secondary" type="button" onClick={() => navigate("/register")}>
           メールアドレスを修正する
         </button>
         <small className="auth-help-text">メールが見つからない場合は、迷惑メールフォルダも確認してください。</small>
