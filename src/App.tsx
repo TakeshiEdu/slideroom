@@ -13,13 +13,13 @@ import {
   FileUp,
   FolderPlus,
   Globe2,
+  House,
   KeyRound,
   ListOrdered,
   Lock,
   LogOut,
   LogIn,
   Mail,
-  Monitor,
   PlusCircle,
   Save,
   Settings,
@@ -569,6 +569,7 @@ function MyRoomsPage() {
   const myRooms = rooms
     .filter((room) => room.hostUserId === currentUser.id || myRoomIds.has(room.id))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const recentRooms = myRooms.slice(0, 3);
 
   function handleLogout() {
     logout();
@@ -578,48 +579,100 @@ function MyRoomsPage() {
 
   return (
     <main className="myrooms-page">
-      <header className="myrooms-header">
-        <BrandMini />
-        <div className="user-menu">
-          <span className="user-avatar">{currentUser.name.trim().charAt(0) || "U"}</span>
-          <strong>{currentUser.name}</strong>
-          <button type="button" onClick={() => navigate("/account")} aria-label="マイページ"><Settings size={22} /></button>
-          <button type="button" onClick={handleLogout} aria-label="ログアウト"><LogOut size={22} /></button>
-        </div>
-      </header>
-      <section className="myrooms-main">
+      <section className="dashboard-shell">
+        <AppTopNav active="rooms" onLogout={handleLogout} />
         <div className="myrooms-hero">
           <div>
             <h1>マイルーム</h1>
-            <p>保存したルームはすべてアカウントに同期されています。</p>
+            <h2>こんにちは、{currentUser.name}さん</h2>
+            <p>保存したルームを管理できます。</p>
           </div>
-          <button className="primary-action" onClick={() => navigate("/create")}>
-            <PlusCircle size={26} /> 新しいルームを作る
-          </button>
+          <div className="hero-action-row">
+            <button className="primary-action" onClick={() => navigate("/create")}>
+              <PlusCircle size={24} /> 新しいルームを作る
+            </button>
+            <button className="secondary-action" onClick={() => navigate("/join")}>
+              <KeyRound size={24} /> ルームに参加する
+            </button>
+          </div>
         </div>
         <section className="saved-rooms">
-          <h2>保存したルーム</h2>
-          {myRooms.length === 0 ? (
-            <div className="myrooms-empty">
-              <FolderPlus size={42} />
-              <strong>まだ保存したルームがありません。</strong>
-              <p>新しいルームを作ると、ここに表示されます。</p>
-            </div>
-          ) : (
-            <div className="room-card-list">
-              {myRooms.map((room, index) => <MyRoomCard key={room.id} room={room} iconIndex={index} />)}
-            </div>
-          )}
-        </section>
-        <section className="sync-callout">
-          <Globe2 size={54} />
-          <div>
-            <strong>すべてのルームはアカウントに同期されています</strong>
-            <p>どのデバイスからでも、ログインすれば最新のルームにアクセスできます。サーバー節約のため、ルーム内のデータは作成から24時間以内に自動削除されます。</p>
+          <div className="section-title-row">
+            <h2>最近使ったルーム</h2>
+            {myRooms.length > 3 && (
+              <button className="see-all-button" type="button">
+                すべて見る <ArrowRight size={18} />
+              </button>
+            )}
+          </div>
+          <div className="room-card-list">
+            {recentRooms.length > 0 ? (
+              recentRooms.map((room, index) => <MyRoomCard key={room.id} room={room} iconIndex={index} />)
+            ) : (
+              <EmptyRoomPanel compact />
+            )}
           </div>
         </section>
+        <EmptyRoomPanel />
+        <SyncFooter />
+        <MobileBottomNav active="rooms" />
       </section>
     </main>
+  );
+}
+
+function AppTopNav({ active, onLogout }: { active: "rooms" | "account"; onLogout?: () => void }) {
+  return (
+    <header className="app-top-nav">
+      <BrandMini />
+      <nav className="main-tabs" aria-label="メインナビゲーション">
+        <button className={cx(active === "rooms" && "is-active")} type="button" onClick={() => navigate("/")}>
+          <House size={22} /> マイルーム
+        </button>
+        <button className={cx(active === "account" && "is-active")} type="button" onClick={() => navigate("/account")}>
+          <User size={22} /> アカウント
+        </button>
+      </nav>
+      <button className="top-icon-button" type="button" onClick={onLogout ?? (() => navigate("/account"))} aria-label={onLogout ? "ログアウト" : "アカウント設定"}>
+        {onLogout ? <LogOut size={22} /> : <Settings size={22} />}
+      </button>
+    </header>
+  );
+}
+
+function MobileBottomNav({ active }: { active: "rooms" | "account" }) {
+  return (
+    <nav className="mobile-bottom-nav" aria-label="モバイルナビゲーション">
+      <button className={cx(active === "rooms" && "is-active")} type="button" onClick={() => navigate("/")}>
+        <House size={25} /> <span>マイルーム</span>
+      </button>
+      <button className={cx(active === "account" && "is-active")} type="button" onClick={() => navigate("/account")}>
+        <User size={25} /> <span>アカウント</span>
+      </button>
+    </nav>
+  );
+}
+
+function EmptyRoomPanel({ compact }: { compact?: boolean }) {
+  return (
+    <section className={cx("empty-room-panel", compact && "is-compact")}>
+      <FolderPlus size={58} />
+      <strong>まだルームがありません</strong>
+      <p>スライドを共有するルームを作成して、チームとコラボレーションを始めましょう。</p>
+      <button className="outline-create-button" type="button" onClick={() => navigate("/create")}>
+        <PlusCircle size={22} /> 新しいルームを作る
+      </button>
+    </section>
+  );
+}
+
+function SyncFooter() {
+  return (
+    <footer className="sync-footer">
+      <span><Globe2 size={21} /> 自動保存 <b>ON</b></span>
+      <i />
+      <span>すべてのデータは同期されています。ルーム内のデータは24時間以内に削除されます。</span>
+    </footer>
   );
 }
 
@@ -630,6 +683,7 @@ function AccountPage() {
     updateAccountName,
     changePassword,
     resendEmailVerification,
+    logout,
   } = useAppStore();
   const [activeTab, setActiveTab] = useState<"settings" | "verification">("settings");
   const [name, setName] = useState(currentUser.name);
@@ -686,10 +740,16 @@ function AccountPage() {
     }
   }
 
+  function handleLogout() {
+    logout();
+    toast.success("ログアウトしました。");
+    navigate("/");
+  }
+
   return (
-    <SimplePage>
-      <BackButton />
-      <CenteredBrand />
+    <main className="myrooms-page">
+      <section className="dashboard-shell">
+        <AppTopNav active="account" onLogout={handleLogout} />
       <section className="account-panel">
         <div className="account-head">
           <span className="user-avatar large">{currentUser.name.trim().charAt(0) || "U"}</span>
@@ -762,35 +822,52 @@ function AccountPage() {
         </div>
       </section>
       {privacyOpen && <PrivacyPolicyModal onClose={() => setPrivacyOpen(false)} />}
-    </SimplePage>
+        <SyncFooter />
+        <MobileBottomNav active="account" />
+      </section>
+    </main>
   );
 }
 
 function MyRoomCard({ room, iconIndex }: { room: Room; iconIndex: number }) {
-  const icons = [Globe2, FolderPlus, ListOrdered, FileText];
-  const Icon = icons[iconIndex % icons.length];
-  const isOnline = room.inviteUrl.startsWith("http");
+  const { members } = useAppStore();
+  const memberCount = members.filter((member) => member.roomId === room.id).length || 1;
   return (
     <button className="myroom-card" type="button" onClick={() => navigate(`/room/${room.id}`)}>
-      <span className="myroom-icon"><Icon size={34} /></span>
+      <RoomCover index={iconIndex} title={room.title} />
       <span className="myroom-body">
         <strong>{room.title}</strong>
-        <small><Clock size={17} /> 最終更新: {formatRoomUpdated(room.updatedAt)}</small>
-      </span>
-      <span className={cx("room-state-pill", isOnline ? "is-online" : "is-local")}>
-        {isOnline ? <Globe2 size={16} /> : <Monitor size={16} />}
-        {isOnline ? "オンライン共有中" : "限定共有"}
+        <span>{memberCount}人が参加中</span>
+        <small><Clock size={17} /> 更新: {formatRelativeRoomUpdated(room.updatedAt)}</small>
       </span>
       <span className="room-card-menu">...</span>
+      <span className="room-card-arrow"><ArrowRight size={22} /></span>
     </button>
   );
 }
 
-function formatRoomUpdated(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+function RoomCover({ index, title }: { index: number; title: string }) {
+  const theme = ["earth", "chart", "plant"][index % 3];
+  return (
+    <span className={cx("room-cover", `is-${theme}`)}>
+      <b>{title}</b>
+      <i />
+    </span>
+  );
 }
+
+function formatRelativeRoomUpdated(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "不明";
+  const diff = Date.now() - date.getTime();
+  const minutes = Math.max(1, Math.floor(diff / 60000));
+  if (minutes < 60) return `${minutes}分前`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}時間前`;
+  const days = Math.floor(hours / 24);
+  return days === 1 ? "昨日" : `${days}日前`;
+}
+
 
 function DataExpiryNotice() {
   return (
