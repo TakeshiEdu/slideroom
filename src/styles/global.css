@@ -3034,18 +3034,18 @@ button:disabled {
   .dashboard-shell {
     width: 100%;
     min-height: 100vh;
-    gap: 26px;
+    gap: 20px;
     border: 0;
     border-radius: 0;
-    padding-bottom: 86px;
+    padding-bottom: 78px;
     box-shadow: none;
   }
 
   .app-top-nav {
     grid-template-columns: 1fr;
-    min-height: 74px;
+    min-height: 66px;
     border-bottom: 0;
-    padding: 0 22px;
+    padding: 0 20px;
   }
 
   .app-top-nav .brand-mini {
@@ -3062,23 +3062,37 @@ button:disabled {
   .empty-room-panel,
   .sync-footer,
   .account-panel {
-    width: min(100%, calc(100vw - 42px));
+    width: min(100%, calc(100vw - 50px));
   }
 
   .myrooms-hero {
     grid-template-columns: 1fr;
-    gap: 18px;
+    gap: 14px;
     padding-top: 0;
   }
 
   .myrooms-hero h1 {
-    margin-bottom: 14px;
-    font-size: 2.25rem;
+    margin-bottom: 10px;
+    font-size: 2.05rem;
+  }
+
+  .myrooms-hero h2 {
+    font-size: 1.08rem;
+  }
+
+  .myrooms-hero p {
+    font-size: 0.92rem;
   }
 
   .hero-action-row {
     grid-template-columns: 1fr;
-    gap: 10px;
+    gap: 9px;
+  }
+
+  .hero-action-row .primary-action,
+  .hero-action-row .secondary-action {
+    min-height: 52px;
+    font-size: 0.95rem;
   }
 
   .room-card-list {
@@ -3087,28 +3101,37 @@ button:disabled {
   }
 
   .myroom-card {
-    grid-template-columns: 132px minmax(0, 1fr) auto;
+    grid-template-columns: 118px minmax(0, 1fr) auto;
     align-items: center;
-    gap: 14px;
+    gap: 12px;
     padding: 8px;
   }
 
   .room-cover {
     grid-column: auto;
-    min-height: 88px;
-    padding: 16px 12px;
+    min-height: 78px;
+    padding: 13px 10px;
   }
 
   .room-cover b {
     max-width: 72%;
-    font-size: 0.73rem;
+    font-size: 0.68rem;
   }
 
   .room-cover i {
     right: 9px;
     bottom: 9px;
-    width: 48px;
-    height: 48px;
+    width: 42px;
+    height: 42px;
+  }
+
+  .myroom-body strong {
+    font-size: 0.92rem;
+  }
+
+  .myroom-body span,
+  .myroom-body small {
+    font-size: 0.82rem;
   }
 
   .room-card-menu {
@@ -3121,7 +3144,7 @@ button:disabled {
   }
 
   .empty-room-panel {
-    padding: 28px 18px;
+    padding: 24px 16px;
   }
 
   .empty-room-panel.is-compact {
@@ -3131,11 +3154,11 @@ button:disabled {
   .sync-footer {
     position: fixed;
     right: 0;
-    bottom: 64px;
+    bottom: 58px;
     left: 0;
     justify-content: center;
     width: 100%;
-    padding: 8px 14px;
+    padding: 7px 14px;
     background: rgba(255, 255, 255, 0.92);
     font-size: 0.75rem;
   }
@@ -3155,7 +3178,7 @@ button:disabled {
     z-index: 20;
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    height: 64px;
+    height: 58px;
     border-top: 1px solid var(--soft-line);
     background: rgba(255, 255, 255, 0.96);
   }
@@ -3168,7 +3191,7 @@ button:disabled {
     border: 0;
     background: transparent;
     color: #455775;
-    font-size: 0.78rem;
+    font-size: 0.72rem;
     font-weight: 950;
   }
 
