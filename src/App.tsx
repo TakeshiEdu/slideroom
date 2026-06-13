@@ -39,7 +39,7 @@ import { useAppStore } from "./stores/useAppStore";
 import type { ExportFormat, ExportSettings, Room, RoomMember, SlideItem, SubmittedFile } from "./types";
 import { formatFileSize } from "./utils/format";
 
-type AppPage = "home" | "login" | "register" | "check-email" | "forgot" | "account" | "create" | "join" | "room" | "order" | "preview";
+type AppPage = "home" | "login" | "register" | "check-email" | "forgot" | "reset-password" | "account" | "create" | "join" | "room" | "order" | "preview";
 
 interface AppRoute {
   page: AppPage;
@@ -54,6 +54,7 @@ function parseHash(): AppRoute {
   if (parts[0] === "register") return { page: "register" };
   if (parts[0] === "check-email") return { page: "check-email" };
   if (parts[0] === "forgot") return { page: "forgot" };
+  if (parts[0] === "reset-password") return { page: "reset-password" };
   if (parts[0] === "account") return { page: "account" };
   if (parts[0] === "create") return { page: "create" };
   if (parts[0] === "join") return { page: "join", inviteCode: parts[1] };
@@ -112,6 +113,7 @@ function App() {
       {route.page === "register" && <RegisterPage />}
       {route.page === "check-email" && <CheckEmailPage />}
       {route.page === "forgot" && <ForgotPasswordPage />}
+      {route.page === "reset-password" && <ResetPasswordPage />}
       {route.page === "account" && (authReady && isAuthenticated ? <AccountPage /> : <LoginPage />)}
       {route.page === "create" && (authReady && isAuthenticated ? <CreateRoomPage /> : <RegisterPage />)}
       {route.page === "join" && <JoinRoomPage inviteCode={route.inviteCode} />}
@@ -437,6 +439,49 @@ function ForgotPasswordPage() {
   );
 }
 
+function ResetPasswordPage() {
+  const { resetPasswordWithSession } = useAppStore();
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!password) return toast.error("新しいパスワードを入力してください。");
+    if (password.length < 8) return toast.error("パスワードは8文字以上にしてください。");
+    if (password !== confirm) return toast.error("確認用パスワードが一致しません。");
+    setSubmitting(true);
+    try {
+      await resetPasswordWithSession(password);
+      toast.success("パスワードを更新しました。");
+      navigate("/login");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "パスワードを更新できませんでした。メールのリンクを開き直してください。");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <AuthPage compact>
+      <form className="auth-form auth-form-card" onSubmit={submit}>
+        <h1>新しいパスワードを設定</h1>
+        <p>メールに届いたリンクを開いた後、この画面で新しいパスワードを設定してください。</p>
+        <label className="auth-field">
+          <span>新しいパスワード</span>
+          <input value={password} onChange={(event) => setPassword(event.target.value)} type="password" placeholder="8文字以上で入力" />
+        </label>
+        <label className="auth-field">
+          <span>新しいパスワード確認</span>
+          <input value={confirm} onChange={(event) => setConfirm(event.target.value)} type="password" placeholder="もう一度入力" />
+        </label>
+        <button className="wide-primary" type="submit" disabled={submitting}>{submitting ? "更新中..." : "パスワードを更新"}</button>
+        <button className="auth-link" type="button" onClick={() => navigate("/login")}>ログインに戻る</button>
+      </form>
+    </AuthPage>
+  );
+}
+
 function TermsModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="modal-backdrop">
@@ -671,17 +716,19 @@ function AccountPage() {
     currentUser,
     isEmailVerified,
     updateAccountName,
-    changePassword,
+    requestEmailChange,
+    requestCurrentUserPasswordReset,
     resendEmailVerification,
     logout,
   } = useAppStore();
   const [activeTab, setActiveTab] = useState<"settings" | "verification">("settings");
   const [name, setName] = useState(currentUser.name);
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [emailChangeSent, setEmailChangeSent] = useState(false);
   const [verificationSent, setVerificationSent] = useState(false);
   const [savingName, setSavingName] = useState(false);
-  const [savingPassword, setSavingPassword] = useState(false);
+  const [sendingEmailChange, setSendingEmailChange] = useState(false);
+  const [sendingPasswordReset, setSendingPasswordReset] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
 
@@ -699,20 +746,34 @@ function AccountPage() {
     }
   }
 
-  async function savePassword(event: FormEvent) {
+  async function sendEmailChange(event: FormEvent) {
     event.preventDefault();
-    if (!newPassword) return toast.error("新しいパスワードを入力してください。");
-    if (newPassword !== confirmPassword) return toast.error("確認用パスワードが一致しません。");
-    setSavingPassword(true);
+    const nextEmail = newEmail.trim();
+    if (!nextEmail) return toast.error("新しいメールアドレスを入力してください。");
+    if (nextEmail.toLowerCase() === currentUser.email?.toLowerCase()) return toast.error("現在と異なるメールアドレスを入力してください。");
+    setSendingEmailChange(true);
     try {
-      await changePassword({ newPassword });
-      setNewPassword("");
-      setConfirmPassword("");
-      toast.success("パスワードを更新しました。");
+      await requestEmailChange(nextEmail);
+      setEmailChangeSent(true);
+      setNewEmail("");
+      toast.success("確認メールを送信しました。");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "パスワードを更新できませんでした。");
+      toast.error(error instanceof Error ? error.message : "確認メールを送信できませんでした。");
     } finally {
-      setSavingPassword(false);
+      setSendingEmailChange(false);
+    }
+  }
+
+  async function sendPasswordReset() {
+    if (!currentUser.email) return toast.error("メールアドレスが登録されていません。");
+    setSendingPasswordReset(true);
+    try {
+      await requestCurrentUserPasswordReset();
+      toast.success("パスワード再設定メールを送信しました。");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "再設定メールを送信できませんでした。");
+    } finally {
+      setSendingPasswordReset(false);
     }
   }
 
@@ -764,25 +825,37 @@ function AccountPage() {
                 <span>表示名</span>
                 <input value={name} onChange={(event) => setName(event.target.value)} placeholder="ユーザー名" />
               </label>
-              <label className="auth-field">
-                <span>メールアドレス</span>
-                <input value={currentUser.email ?? ""} readOnly placeholder="未設定" />
-              </label>
               <button className="wide-primary" type="submit" disabled={savingName}>{savingName ? "保存中..." : "ユーザー名を保存"}</button>
             </form>
-            <form className="account-card" onSubmit={savePassword}>
-              <h2><KeyRound size={23} /> パスワード変更</h2>
-              <p className="account-card-help">ログイン中のアカウントに新しいパスワードを設定します。</p>
+            <form className="account-card" onSubmit={sendEmailChange}>
+              <h2><Mail size={23} /> メールアドレス変更</h2>
+              <p className="account-card-help">新しいメールアドレス宛に確認リンクを送信します。リンクを開くまでメールアドレスは変更されません。</p>
               <label className="auth-field">
-                <span>新しいパスワード</span>
-                <input value={newPassword} onChange={(event) => setNewPassword(event.target.value)} type="password" placeholder="新しいパスワード" />
+                <span>現在のメールアドレス</span>
+                <input value={currentUser.email ?? ""} readOnly placeholder="未設定" />
               </label>
               <label className="auth-field">
-                <span>新しいパスワード確認</span>
-                <input value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} type="password" placeholder="もう一度入力" />
+                <span>新しいメールアドレス</span>
+                <input value={newEmail} onChange={(event) => setNewEmail(event.target.value)} type="email" placeholder="new@example.com" />
               </label>
-              <button className="wide-primary" type="submit" disabled={savingPassword}>{savingPassword ? "更新中..." : "パスワードを更新"}</button>
+              {emailChangeSent && (
+                <div className="auth-message-box" role="status">
+                  <Mail size={24} />
+                  <div>
+                    <strong>確認メールを送信しました</strong>
+                    <p>新しいメールアドレスに届いたリンクを開くと変更が完了します。届かない場合は迷惑メールフォルダも確認してください。</p>
+                  </div>
+                </div>
+              )}
+              <button className="wide-primary" type="submit" disabled={sendingEmailChange}>{sendingEmailChange ? "送信中..." : "確認メールを送信"}</button>
             </form>
+            <section className="account-card">
+              <h2><KeyRound size={23} /> パスワード変更</h2>
+              <p className="account-card-help">登録メールアドレスに再設定リンクを送信します。リンクを開いた後に新しいパスワードを設定できます。</p>
+              <button className="wide-primary" type="button" onClick={sendPasswordReset} disabled={sendingPasswordReset || !currentUser.email}>
+                {sendingPasswordReset ? "送信中..." : "パスワード再設定メールを送信"}
+              </button>
+            </section>
           </>
         )}
         {activeTab === "verification" && (

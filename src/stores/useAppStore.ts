@@ -13,6 +13,7 @@ import {
 import { analyzePptxBlob } from "../services/pptxAnalysisService";
 import {
   getCurrentAuthUser,
+  requestEmailChange as requestAuthEmailChange,
   requestPasswordResetEmail,
   resendEmailVerification,
   signInWithEmail,
@@ -69,7 +70,9 @@ interface AppState {
   register: (input: { name: string; email: string; password: string }) => Promise<UserProfile | null>;
   login: (input: { email: string; password: string }) => Promise<void>;
   updateAccountName: (name: string) => Promise<void>;
-  changePassword: (input: { currentPassword?: string; newPassword: string }) => Promise<void>;
+  requestEmailChange: (newEmail: string) => Promise<void>;
+  requestCurrentUserPasswordReset: () => Promise<void>;
+  resetPasswordWithSession: (newPassword: string) => Promise<void>;
   requestPasswordReset: (email: string) => Promise<void>;
   resendEmailVerification: (email?: string) => Promise<void>;
   verifySignupEmailCode: (input: { email: string; code: string }) => Promise<void>;
@@ -317,8 +320,18 @@ export const useAppStore = create<AppState>()(
         syncSharedState(get);
       },
 
-      async changePassword(input) {
-        await updateAuthPassword(input.newPassword);
+      async requestEmailChange(newEmail) {
+        await requestAuthEmailChange(newEmail);
+      },
+
+      async requestCurrentUserPasswordReset() {
+        const email = get().currentUser.email;
+        if (!email) throw new Error("メールアドレスが登録されていません。");
+        await requestPasswordResetEmail(email);
+      },
+
+      async resetPasswordWithSession(newPassword) {
+        await updateAuthPassword(newPassword);
       },
 
       async requestPasswordReset(email) {

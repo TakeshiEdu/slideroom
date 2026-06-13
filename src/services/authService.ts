@@ -106,9 +106,17 @@ export async function updateAuthPassword(password: string) {
   if (error) throw error;
 }
 
+export async function requestEmailChange(newEmail: string) {
+  const { error } = await getSupabaseBrowserClient().auth.updateUser(
+    { email: newEmail.trim().toLowerCase() },
+    { emailRedirectTo: `${window.location.origin}/#/account` },
+  );
+  if (error) throw error;
+}
+
 export async function requestPasswordResetEmail(email: string) {
   const { error } = await getSupabaseBrowserClient().auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-    redirectTo: `${window.location.origin}/#/account`,
+    redirectTo: `${window.location.origin}/#/reset-password`,
   });
   if (error) throw error;
 }
