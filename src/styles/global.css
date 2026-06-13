@@ -3018,7 +3018,7 @@ button:disabled {
     gap: 20px;
     border: 0;
     border-radius: 0;
-    padding-bottom: 78px;
+    padding-bottom: 66px;
     box-shadow: none;
   }
 
@@ -3159,7 +3159,7 @@ button:disabled {
     z-index: 20;
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    height: 58px;
+    height: 52px;
     border-top: 1px solid var(--soft-line);
     background: rgba(255, 255, 255, 0.96);
   }
@@ -3168,12 +3168,17 @@ button:disabled {
     display: grid;
     justify-items: center;
     align-content: center;
-    gap: 3px;
+    gap: 2px;
     border: 0;
     background: transparent;
     color: #455775;
-    font-size: 0.72rem;
+    font-size: 0.68rem;
     font-weight: 950;
+  }
+
+  .mobile-bottom-nav svg {
+    width: 22px;
+    height: 22px;
   }
 
   .mobile-bottom-nav button.is-active {
