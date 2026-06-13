@@ -32,6 +32,7 @@ import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from "reac
 import { saveAs } from "file-saver";
 import { Toaster, toast } from "sonner";
 import previewHero from "./assets/slide-preview-hero.png";
+import { consumeAuthRedirectNotice, type AuthRedirectNotice } from "./services/authService";
 import { mergeService } from "./services/mergeService";
 import { createPptxSlidePreviewSvgs } from "./services/pptxPreviewService";
 import { getBlob } from "./services/storageService";
@@ -53,6 +54,9 @@ function parseHash(): AppRoute {
     .replace(/%23.*$/i, "")
     .replace(/#.*$/, "");
   const parts = raw.split("/").filter(Boolean);
+  if (parts[0]?.startsWith("message=") || parts[0]?.startsWith("error=") || parts[0]?.startsWith("error_description=")) {
+    return { page: "account" };
+  }
   if (parts[0] === "login") return { page: "login" };
   if (parts[0] === "register") return { page: "register" };
   if (parts[0] === "check-email") return { page: "check-email" };
@@ -734,6 +738,20 @@ function AccountPage() {
   const [sendingPasswordReset, setSendingPasswordReset] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
+  const [authNotice, setAuthNotice] = useState<AuthRedirectNotice | null>(null);
+
+  useEffect(() => {
+    const notice = consumeAuthRedirectNotice();
+    if (!notice) return;
+    setAuthNotice(notice);
+    if (notice.kind === "error") {
+      toast.error(notice.message);
+    } else if (notice.kind === "email-change-complete") {
+      toast.success("メールアドレスの確認が完了しました。");
+    } else {
+      toast.info(notice.message);
+    }
+  }, []);
 
   async function saveName(event: FormEvent) {
     event.preventDefault();
@@ -820,6 +838,15 @@ function AccountPage() {
             <ShieldCheck size={20} /> ユーザー認証
           </button>
         </div>
+        {authNotice && (
+          <div className={cx("auth-message-box", "account-redirect-notice", authNotice.kind === "error" && "is-error", authNotice.kind === "email-change-pending" && "is-warning")} role="status">
+            {authNotice.kind === "error" ? <X size={24} /> : <Mail size={24} />}
+            <div>
+              <strong>{authNotice.kind === "email-change-pending" ? "もう一方の確認メールも開いてください" : authNotice.kind === "email-change-complete" ? "確認リンクを受け付けました" : "確認リンクを受け付けました"}</strong>
+              <p>{authNotice.message}</p>
+            </div>
+          </div>
+        )}
         {activeTab === "settings" && (
           <>
             <form className="account-card" onSubmit={saveName}>
@@ -832,7 +859,7 @@ function AccountPage() {
             </form>
             <form className="account-card" onSubmit={sendEmailChange}>
               <h2><Mail size={23} /> メールアドレス変更</h2>
-              <p className="account-card-help">新しいメールアドレス宛に確認リンクを送信します。リンクを開くまでメールアドレスは変更されません。</p>
+              <p className="account-card-help">現在のメールアドレスと新しいメールアドレスの両方に確認リンクを送信します。両方のリンクを開くまで、メールアドレスは変更されません。</p>
               <label className="auth-field">
                 <span>現在のメールアドレス</span>
                 <input value={currentUser.email ?? ""} readOnly placeholder="未設定" />
@@ -846,7 +873,7 @@ function AccountPage() {
                   <Mail size={24} />
                   <div>
                     <strong>確認メールを送信しました</strong>
-                    <p>新しいメールアドレスに届いたリンクを開くと変更が完了します。届かない場合は迷惑メールフォルダも確認してください。</p>
+                    <p>現在のメールアドレスと新しいメールアドレスに届いた確認リンクを両方開くと変更が完了します。届かない場合は迷惑メールフォルダも確認してください。</p>
                   </div>
                 </div>
               )}

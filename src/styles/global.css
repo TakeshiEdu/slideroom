@@ -387,6 +387,30 @@ button:disabled {
   color: var(--navy);
 }
 
+.account-redirect-notice {
+  margin-bottom: 22px;
+}
+
+.account-redirect-notice.is-warning {
+  border-color: #ffd59b;
+  background: #fff7e8;
+  color: #7a4b00;
+}
+
+.account-redirect-notice.is-warning svg {
+  color: #d97706;
+}
+
+.account-redirect-notice.is-error {
+  border-color: #fecaca;
+  background: #fff1f2;
+  color: #9f1239;
+}
+
+.account-redirect-notice.is-error svg {
+  color: #e11d48;
+}
+
 .auth-help-text {
   color: var(--muted);
   font-weight: 800;

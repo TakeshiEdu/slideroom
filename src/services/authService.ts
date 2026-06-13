@@ -2,6 +2,12 @@ import { createClient, type SupabaseClient, type User as SupabaseUser } from "@s
 import type { UserProfile } from "../types";
 
 let browserSupabase: SupabaseClient | undefined;
+const authRedirectNoticeKey = "slideroom-auth-redirect-notice";
+
+export interface AuthRedirectNotice {
+  kind: "email-change-pending" | "email-change-complete" | "error" | "info";
+  message: string;
+}
 
 export function isAuthConfigured() {
   return Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
@@ -50,13 +56,71 @@ export async function getCurrentAuthUser() {
   return toUserProfile(data.user);
 }
 
+function storeAuthRedirectNotice(notice: AuthRedirectNotice) {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem(authRedirectNoticeKey, JSON.stringify(notice));
+}
+
+export function consumeAuthRedirectNotice(): AuthRedirectNotice | null {
+  if (typeof window === "undefined") return null;
+  const raw = window.sessionStorage.getItem(authRedirectNoticeKey);
+  if (!raw) return null;
+  window.sessionStorage.removeItem(authRedirectNoticeKey);
+
+  try {
+    return JSON.parse(raw) as AuthRedirectNotice;
+  } catch {
+    return null;
+  }
+}
+
+function noticeFromRedirectParams(params: URLSearchParams): AuthRedirectNotice | null {
+  const error = params.get("error_description") || params.get("error");
+  if (error) {
+    return {
+      kind: "error",
+      message: decodeURIComponent(error.replace(/\+/g, " ")),
+    };
+  }
+
+  const message = params.get("message");
+  if (!message) return null;
+
+  const normalized = decodeURIComponent(message.replace(/\+/g, " "));
+  if (normalized.toLowerCase().includes("other email")) {
+    return {
+      kind: "email-change-pending",
+      message: "片方のメールアドレスは確認できました。メールアドレス変更を完了するには、もう一方のメールに届いた確認リンクも開いてください。",
+    };
+  }
+
+  return {
+    kind: normalized.toLowerCase().includes("email") ? "email-change-complete" : "info",
+    message: normalized,
+  };
+}
+
 export async function recoverSessionFromRedirectHash() {
   if (!isAuthConfigured()) return;
   const hash = window.location.hash;
+  const hashParams = new URLSearchParams(hash.replace(/^#/, ""));
+  const notice = noticeFromRedirectParams(hashParams);
+  if (notice) {
+    storeAuthRedirectNotice(notice);
+  }
+
   const encodedFragment = hash.match(/%23(.+)$/)?.[1];
   const directFragment = hash.match(/#\/[^#]+#(.+)$/)?.[1];
   const authFragment = encodedFragment ? decodeURIComponent(encodedFragment) : directFragment;
-  if (!authFragment || !authFragment.includes("access_token=")) return;
+  const shouldRefreshSession = Boolean(notice);
+  if (!authFragment || !authFragment.includes("access_token=")) {
+    if (shouldRefreshSession) {
+      const { data } = await getSupabaseBrowserClient().auth.getSession();
+      if (data.session) await getSupabaseBrowserClient().auth.refreshSession();
+      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#/account`);
+    }
+    return;
+  }
 
   const params = new URLSearchParams(authFragment);
   const accessToken = params.get("access_token");
