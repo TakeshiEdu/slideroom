@@ -119,6 +119,21 @@ button:disabled {
   font-weight: 900;
 }
 
+.home-login-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  border: 1.5px solid #bfd0ea;
+  border-radius: 8px;
+  padding: 0 18px;
+  background: #ffffff;
+  color: var(--blue);
+  font-weight: 950;
+  box-shadow: 0 8px 20px rgba(31, 54, 86, 0.06);
+}
+
 .auth-page,
 .myrooms-page {
   min-height: 100vh;
@@ -2166,6 +2181,17 @@ button:disabled {
     font-size: 0.86rem;
   }
 
+  .home-login-button {
+    min-height: 38px;
+    padding: 0 13px;
+    font-size: 0.9rem;
+  }
+
+  .home-login-button svg {
+    width: 18px;
+    height: 18px;
+  }
+
   .home-hero {
     padding: 26px 22px 18px;
   }
@@ -2439,6 +2465,12 @@ button:disabled {
 
   .text-link {
     display: none;
+  }
+
+  .home-login-button {
+    min-height: 36px;
+    padding: 0 11px;
+    font-size: 0.86rem;
   }
 
   .home-hero h1 {

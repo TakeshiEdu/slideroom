@@ -130,7 +130,7 @@ function HomePage({ room: _room }: { room?: Room }) {
   return (
     <main className="home-shell">
       <section className="home-card">
-        <SimpleHeader action={<button className="text-link">使い方はとても簡単</button>} />
+        <SimpleHeader action={<button className="home-login-button" type="button" onClick={() => navigate("/login")}><LogIn size={20} /> ログイン</button>} />
         <div className="home-hero">
           <span className="pill">PowerPoint合体を、いちばんシンプルに。</span>
           <h1>みんなの <b>PowerPoint</b> を、<br />ひとつに。</h1>
