@@ -352,6 +352,20 @@ button:disabled {
   margin: 0;
 }
 
+.account-note p {
+  margin: 0;
+}
+
+.account-note button {
+  border: 0;
+  background: transparent;
+  color: var(--blue);
+  font: inherit;
+  font-weight: 950;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
 .auth-message-box strong {
   display: block;
   margin-bottom: 4px;
@@ -535,6 +549,12 @@ button:disabled {
   margin: 0;
   color: var(--navy);
   font-size: clamp(1.8rem, 4vw, 2.5rem);
+}
+
+.policy-updated {
+  margin: -12px 0 0;
+  color: var(--muted);
+  font-weight: 850;
 }
 
 .terms-body {

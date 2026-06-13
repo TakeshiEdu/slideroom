@@ -169,6 +169,7 @@ function RegisterPage() {
   const [confirm, setConfirm] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [termsOpen, setTermsOpen] = useState(false);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -179,7 +180,7 @@ function RegisterPage() {
     if (!email.trim()) return toast.error("メールアドレスを入力してください。");
     if (!password) return toast.error("パスワードを入力してください。");
     if (password !== confirm) return toast.error("パスワード確認が一致しません。");
-    if (!agreed) return toast.error("利用規約への同意をチェックしてください。");
+    if (!agreed) return toast.error("利用規約とプライバシーポリシーへの同意をチェックしてください。");
     setSubmitting(true);
     try {
       await register({ name, email, password });
@@ -225,12 +226,16 @@ function RegisterPage() {
         />
         <label className="terms-row">
           <input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} />
-          <span><button type="button" onClick={() => setTermsOpen(true)}>利用規約</button>に同意します</span>
+          <span>
+            <button type="button" onClick={() => setTermsOpen(true)}>利用規約</button>と
+            <button type="button" onClick={() => setPrivacyOpen(true)}>プライバシーポリシー</button>に同意します
+          </span>
         </label>
         <button className="wide-primary" type="submit" disabled={submitting}>{submitting ? "登録中..." : "登録する"}</button>
         <p className="auth-switch">すでにアカウントをお持ちですか？ <button type="button" onClick={() => navigate("/login")}>ログイン</button></p>
       </form>
       {termsOpen && <TermsModal onClose={() => setTermsOpen(false)} />}
+      {privacyOpen && <PrivacyPolicyModal onClose={() => setPrivacyOpen(false)} />}
     </AuthPage>
   );
 }
@@ -467,6 +472,53 @@ function TermsModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+function PrivacyPolicyModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="modal-backdrop">
+      <section className="terms-modal" role="dialog" aria-modal="true" aria-labelledby="privacy-title">
+        <button className="close-button" onClick={onClose} aria-label="閉じる"><X size={26} /></button>
+        <h2 id="privacy-title">プライバシーポリシー</h2>
+        <p className="policy-updated">制定日: 2026年6月13日</p>
+        <div className="terms-body">
+          <section>
+            <h3>1. 取得する情報</h3>
+            <p>SlideRoomは、アカウント作成、ログイン、ルーム共有、ファイル結合のために、ユーザー名、メールアドレス、認証状態、作成したルーム情報、参加者名、アップロードされたPPTXファイル、生成したプレビューや出力履歴を取り扱います。</p>
+          </section>
+          <section>
+            <h3>2. 利用目的</h3>
+            <p>取得した情報は、本人確認、ログイン状態の維持、ルームの保存と共有、提出ファイルの表示、PPTX/PDF出力、問い合わせ対応、不正利用や障害の調査のために利用します。</p>
+          </section>
+          <section>
+            <h3>3. 認証情報の扱い</h3>
+            <p>メールアドレス、パスワード、メール認証コードなどの認証処理はSupabase Authを利用して管理します。SlideRoomの画面上でパスワードそのものを表示したり、アプリ独自の平文データとして保存したりしません。</p>
+          </section>
+          <section>
+            <h3>4. ファイルとルームデータの保存期間</h3>
+            <p>ルーム内のファイル、スライド、出力履歴などの作業データは、サーバー容量節約と不要データ削減のため、作成から24時間以内に削除される前提です。必要なPPTX/PDFは早めに書き出して保存してください。</p>
+          </section>
+          <section>
+            <h3>5. 外部サービス</h3>
+            <p>SlideRoomは、認証とデータ保存にSupabase、公開環境の配信にVercelを利用します。これらのサービス上で、アプリの提供に必要な範囲のデータが処理されます。</p>
+          </section>
+          <section>
+            <h3>6. 第三者提供</h3>
+            <p>法令に基づく場合、本人の同意がある場合、またはサービス提供に必要な外部サービスでの処理を除き、取得した情報を第三者に販売または提供しません。</p>
+          </section>
+          <section>
+            <h3>7. アップロード時の注意</h3>
+            <p>PPTXファイルには氏名、学籍番号、画像、メモ、非表示スライドなどが含まれる場合があります。不要な個人情報や機密情報を含むファイルはアップロードしないでください。</p>
+          </section>
+          <section>
+            <h3>8. ポリシーの変更</h3>
+            <p>機能追加、保存先の変更、法令対応などにより、本ポリシーを更新することがあります。重要な変更がある場合は、アプリ内または関連ドキュメントで案内します。</p>
+          </section>
+        </div>
+        <button className="wide-primary" type="button" onClick={onClose}>閉じる</button>
+      </section>
+    </div>
+  );
+}
+
 function AuthPage({ children, compact }: { children: ReactNode; compact?: boolean }) {
   return (
     <main className={cx("auth-page", compact && "is-compact")}>
@@ -587,6 +639,7 @@ function AccountPage() {
   const [savingName, setSavingName] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
 
   async function saveName(event: FormEvent) {
     event.preventDefault();
@@ -699,8 +752,16 @@ function AccountPage() {
             <small>メールが届かない場合は、迷惑メールに分類されている可能性があります。迷惑メールフォルダを確認するか、時間を置いて再送信してください。</small>
           </section>
         )}
-        <p className="account-note"><ShieldCheck size={20} /> ログイン情報とセッションは安全な認証基盤で管理されます。</p>
+        <div className="account-note">
+          <ShieldCheck size={20} />
+          <p>
+            アカウント情報、アップロードファイル、ルームデータの扱いは
+            <button type="button" onClick={() => setPrivacyOpen(true)}>プライバシーポリシー</button>
+            に記載しています。
+          </p>
+        </div>
       </section>
+      {privacyOpen && <PrivacyPolicyModal onClose={() => setPrivacyOpen(false)} />}
     </SimplePage>
   );
 }
