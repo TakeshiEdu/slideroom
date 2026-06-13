@@ -13,6 +13,7 @@ import {
 import { analyzePptxBlob } from "../services/pptxAnalysisService";
 import {
   getCurrentAuthUser,
+  recoverSessionFromRedirectHash,
   requestEmailChange as requestAuthEmailChange,
   requestPasswordResetEmail,
   resendEmailVerification,
@@ -225,6 +226,8 @@ export const useAppStore = create<AppState>()(
       ...baseState(),
 
       async initializeAuth() {
+        await recoverSessionFromRedirectHash();
+
         if (authUnsubscribe) {
           const user = await getCurrentAuthUser();
           set({

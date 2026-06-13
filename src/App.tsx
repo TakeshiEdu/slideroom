@@ -48,7 +48,10 @@ interface AppRoute {
 }
 
 function parseHash(): AppRoute {
-  const raw = window.location.hash.replace(/^#\/?/, "");
+  const raw = window.location.hash
+    .replace(/^#\/?/, "")
+    .replace(/%23.*$/i, "")
+    .replace(/#.*$/, "");
   const parts = raw.split("/").filter(Boolean);
   if (parts[0] === "login") return { page: "login" };
   if (parts[0] === "register") return { page: "register" };

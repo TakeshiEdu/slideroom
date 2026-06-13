@@ -50,6 +50,29 @@ export async function getCurrentAuthUser() {
   return toUserProfile(data.user);
 }
 
+export async function recoverSessionFromRedirectHash() {
+  if (!isAuthConfigured()) return;
+  const hash = window.location.hash;
+  const encodedFragment = hash.match(/%23(.+)$/)?.[1];
+  const directFragment = hash.match(/#\/[^#]+#(.+)$/)?.[1];
+  const authFragment = encodedFragment ? decodeURIComponent(encodedFragment) : directFragment;
+  if (!authFragment || !authFragment.includes("access_token=")) return;
+
+  const params = new URLSearchParams(authFragment);
+  const accessToken = params.get("access_token");
+  const refreshToken = params.get("refresh_token");
+  if (!accessToken || !refreshToken) return;
+
+  const { error } = await getSupabaseBrowserClient().auth.setSession({
+    access_token: accessToken,
+    refresh_token: refreshToken,
+  });
+  if (error) throw error;
+
+  const cleanHash = hash.replace(/%23.*$/i, "").replace(/#([^#]*)#.*$/, "#$1");
+  window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${cleanHash}`);
+}
+
 export async function signUpWithEmail(input: { name: string; email: string; password: string }) {
   const { data, error } = await getSupabaseBrowserClient().auth.signUp({
     email: input.email.trim().toLowerCase(),
