@@ -353,6 +353,7 @@ export const useAppStore = create<AppState>()(
           teamName: input.teamName?.trim(),
           description: input.description?.trim(),
           status: "draft",
+          accessMode: input.accessMode ?? "invite",
           hostUserId: get().currentUser.id,
           inviteCode,
           inviteUrl: createInviteUrl(inviteCode),
@@ -415,6 +416,10 @@ export const useAppStore = create<AppState>()(
         const normalized = inviteCode.trim().toUpperCase();
         const room = get().rooms.find((candidate) => candidate.inviteCode.toUpperCase() === normalized);
         if (!room) return { error: "招待コードが見つかりません。" };
+
+        if ((room.accessMode ?? "invite") === "authenticated" && !get().isAuthenticated) {
+          return { error: "このルームはログインしているユーザーだけ参加できます。ログイン後にもう一度参加してください。" };
+        }
 
         const existing = get().members.find((member) => member.roomId === room.id && member.userId === get().currentUser.id);
         if (existing) {

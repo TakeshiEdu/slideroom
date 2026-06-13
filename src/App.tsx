@@ -881,7 +881,7 @@ function DataExpiryNotice() {
 function CreateRoomPage() {
   const { createRoom } = useAppStore();
   const [title, setTitle] = useState("");
-  const [mode, setMode] = useState<"url" | "password">("url");
+  const [accessMode, setAccessMode] = useState<"invite" | "authenticated">("invite");
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -889,7 +889,7 @@ function CreateRoomPage() {
       toast.error("タイトルを入力してください。");
       return;
     }
-    const room = createRoom({ title, className: "発表ルーム" });
+    const room = createRoom({ title, className: "発表ルーム", accessMode });
     navigate(`/room/${room.id}`);
   }
 
@@ -907,13 +907,13 @@ function CreateRoomPage() {
         <div className="field">
           <span>公開設定</span>
           <div className="choice-list">
-            <button className={cx("choice", mode === "url" && "is-active")} type="button" onClick={() => setMode("url")}>
-              <span className="radio-dot" /> URLを知っている人が参加できる
+            <button className={cx("choice", accessMode === "invite" && "is-active")} type="button" onClick={() => setAccessMode("invite")}>
+              <span className="radio-dot" /> URLまたは6ケタパスワードで参加
             </button>
-            <button className={cx("choice", mode === "password" && "is-active")} type="button" onClick={() => setMode("password")}>
-              <span className="radio-dot" /> 6ケタパスワードで参加
+            <button className={cx("choice", accessMode === "authenticated" && "is-active")} type="button" onClick={() => setAccessMode("authenticated")}>
+              <span className="radio-dot" /> ログインしているユーザーだけ参加可能
             </button>
-            {mode === "password" && <PasscodePreview />}
+            {accessMode === "invite" && <PasscodePreview />}
           </div>
         </div>
         <button className="wide-primary" type="submit">ルームを作成</button>
@@ -966,6 +966,7 @@ function RoomPage({ room }: { room: Room }) {
   const { files, slides, members } = useAppStore();
   const [exportOpen, setExportOpen] = useState(false);
   const shareUrl = createLocalInviteUrl(room.inviteCode);
+  const accessMode = room.accessMode ?? "invite";
   const roomFiles = files.filter((file) => file.roomId === room.id && file.status !== "excluded");
   const roomSlides = slides.filter((slide) => slide.roomId === room.id && slide.isPlaced);
   const roomMembers = members.filter((member) => member.roomId === room.id);
@@ -977,9 +978,14 @@ function RoomPage({ room }: { room: Room }) {
         <BackButton inline />
         <h1>{room.title}</h1>
         <div className="share-grid">
-          <CopyField label="共有URL" value={shareUrl} />
-          <CopyField label="ルームパスワード" value={room.inviteCode} />
+          <CopyField label="参加URL" value={shareUrl} />
+          <CopyField label="6ケタパスコード" value={room.inviteCode} />
         </div>
+        <p className="access-mode-note">
+          {accessMode === "authenticated"
+            ? "このルームはログインしているユーザーだけ参加できます。"
+            : "参加URLまたは6ケタパスコードを共有すると参加できます。"}
+        </p>
         <DataExpiryNotice />
         <UploadBox roomId={room.id} />
         <MemberSection members={roomMembers} />
@@ -1399,7 +1405,7 @@ function DemoScreenshots() {
         <DemoScreen
           step="1"
           title="タイトルと公開設定"
-          caption="タイトルを入れて、URL参加かパスワード参加を選びます。"
+          caption="タイトルを入れて、リンク/パスコード参加かログイン限定を選びます。"
           variant="room"
         />
         <DemoScreen
@@ -1440,8 +1446,8 @@ function DemoScreen({ step, title, caption, variant }: { step: string; title: st
             <label>
               <b>公開設定</b>
               <div className="demo-choice-row">
-                <span>URL参加</span>
-                <span>パスワード</span>
+                <span>リンク/パスコード</span>
+                <span>ログイン限定</span>
               </div>
             </label>
             <button>ルームを作成</button>

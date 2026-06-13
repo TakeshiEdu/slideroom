@@ -3,6 +3,7 @@ export type FileStatus = "submitted" | "not_submitted" | "revision_requested" | 
 export type MemberRole = "host" | "admin" | "member" | "viewer";
 export type ExportFormat = "pptx" | "pdf" | "zip";
 export type PptxAnalysisStatus = "not_applicable" | "parsed" | "fallback" | "failed";
+export type RoomAccessMode = "invite" | "authenticated";
 
 export interface UserProfile {
   id: string;
@@ -19,6 +20,7 @@ export interface Room {
   teamName?: string;
   description?: string;
   status: RoomStatus;
+  accessMode?: RoomAccessMode;
   hostUserId: string;
   inviteCode: string;
   inviteUrl: string;
@@ -125,6 +127,7 @@ export interface AppSettings {
 
 export interface RoomInput {
   title: string;
+  accessMode?: RoomAccessMode;
   className?: string;
   teamName?: string;
   description?: string;

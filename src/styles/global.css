@@ -935,6 +935,14 @@ button:disabled {
   color: var(--blue);
 }
 
+.access-mode-note {
+  margin: -6px 0 0;
+  color: #52647d;
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
 .home-hero {
   display: grid;
   justify-items: center;
