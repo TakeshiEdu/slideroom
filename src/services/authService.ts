@@ -65,6 +65,17 @@ export async function signUpWithEmail(input: { name: string; email: string; pass
   return data.user ? toUserProfile(data.user) : null;
 }
 
+export async function verifyEmailOtp(input: { email: string; token: string }) {
+  const { data, error } = await getSupabaseBrowserClient().auth.verifyOtp({
+    type: "signup",
+    email: input.email.trim().toLowerCase(),
+    token: input.token.trim(),
+  });
+  if (error) throw error;
+  if (!data.user) throw new Error("メール認証を完了できませんでした。");
+  return toUserProfile(data.user);
+}
+
 export async function signInWithEmail(input: { email: string; password: string }) {
   const { data, error } = await getSupabaseBrowserClient().auth.signInWithPassword({
     email: input.email.trim().toLowerCase(),

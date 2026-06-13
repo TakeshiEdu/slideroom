@@ -184,7 +184,7 @@ function RegisterPage() {
     try {
       await register({ name, email, password });
       window.sessionStorage.setItem("slideroom.pendingSignupEmail", email.trim());
-      toast.success("確認メールを送信しました。メール内のリンクを開いてください。");
+      toast.success("6桁のパスコードを送信しました。メールを確認してください。");
       navigate("/check-email");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "登録できませんでした。");
@@ -236,34 +236,97 @@ function RegisterPage() {
 }
 
 function CheckEmailPage() {
-  const [email] = useState(() => window.sessionStorage.getItem("slideroom.pendingSignupEmail") ?? "");
+  const { verifySignupEmailCode, resendEmailVerification } = useAppStore();
+  const [email, setEmail] = useState(() => window.sessionStorage.getItem("slideroom.pendingSignupEmail") ?? "");
+  const [code, setCode] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [resending, setResending] = useState(false);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    const nextEmail = email.trim();
+    const nextCode = code.trim();
+    if (!nextEmail) return toast.error("メールアドレスを入力してください。");
+    if (!/^\d{6}$/.test(nextCode)) return toast.error("6桁のパスコードを入力してください。");
+    setVerifying(true);
+    try {
+      await verifySignupEmailCode({ email: nextEmail, code: nextCode });
+      window.sessionStorage.removeItem("slideroom.pendingSignupEmail");
+      toast.success("メール認証が完了しました。");
+      navigate("/");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "パスコードを確認できませんでした。");
+    } finally {
+      setVerifying(false);
+    }
+  }
+
+  async function resendCode() {
+    const nextEmail = email.trim();
+    if (!nextEmail) return toast.error("メールアドレスを入力してください。");
+    setResending(true);
+    try {
+      await resendEmailVerification(nextEmail);
+      toast.success("6桁のパスコードを再送信しました。");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "パスコードを再送信できませんでした。");
+    } finally {
+      setResending(false);
+    }
+  }
 
   return (
     <AuthPage>
-      <section className="check-email-screen">
+      <form className="check-email-screen" onSubmit={submit}>
         <div className="check-email-icon" aria-hidden="true">
           <Mail size={64} />
         </div>
         <p className="check-email-kicker">あと少しで登録完了です</p>
-        <h1>メールを確認してください</h1>
+        <h1>6桁のパスコードを入力してください</h1>
         <p className="check-email-lead">
-          {email ? `${email} 宛に確認メールを送信しました。` : "入力したメールアドレス宛に確認メールを送信しました。"}
-          メール内の確認リンクを開くと、SlideRoomのアカウント認証が完了します。
+          {email ? `${email} 宛に6桁のパスコードを送信しました。` : "入力したメールアドレス宛に6桁のパスコードを送信しました。"}
+          メールに記載された数字を入力すると、このままSlideRoomを使い始められます。
         </p>
-        <button className="check-email-primary" type="button" onClick={() => navigate("/login")}>
-          認証しました
+        {email ? (
+          <div className="check-email-address">
+            <span>送信先</span>
+            <strong>{email}</strong>
+          </div>
+        ) : (
+          <label className="check-email-field">
+            <span>メールアドレス</span>
+            <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" placeholder="name@example.com" />
+          </label>
+        )}
+        <label className="check-email-field">
+          <span>6桁のパスコード</span>
+          <input
+            className="otp-input"
+            value={code}
+            onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+            inputMode="numeric"
+            pattern="[0-9]*"
+            placeholder="000000"
+            autoFocus
+          />
+        </label>
+        <button className="check-email-primary" type="submit" disabled={verifying}>
+          {verifying ? "認証中..." : "パスコードを確認する"}
         </button>
-        <p className="check-email-sub">メール認証が終わったら、このボタンからログインへ進んでください。</p>
+        <p className="check-email-sub">認証が完了すると、ログインし直さずにそのまま進めます。</p>
         <div className="check-email-steps" aria-label="メール認証の手順">
           <span>1. メールを開く</span>
-          <span>2. 確認リンクを押す</span>
-          <span>3. 下のボタンを押す</span>
+          <span>2. 6桁の数字を見る</span>
+          <span>3. この画面に入力する</span>
         </div>
+        <button className="check-email-secondary" type="button" onClick={resendCode} disabled={resending}>
+          {resending ? "再送信中..." : "パスコードを再送信する"}
+        </button>
         <button className="check-email-secondary" type="button" onClick={() => navigate("/register")}>
           メールアドレスを修正する
         </button>
-        <small className="auth-help-text">メールが見つからない場合は、迷惑メールフォルダも確認してください。</small>
-      </section>
+        <small className="auth-help-text">メールが見つからない場合は、迷惑メールに分類されている可能性があります。迷惑メールフォルダも確認してください。</small>
+      </form>
     </AuthPage>
   );
 }
@@ -562,7 +625,7 @@ function AccountPage() {
     try {
       await resendEmailVerification();
       setVerificationSent(true);
-      toast.success("確認メールを送信しました。メール内のリンクを開いてください。");
+      toast.success("6桁のパスコードを送信しました。メールを確認してください。");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "確認メールを送信できませんでした。");
     } finally {
@@ -622,18 +685,18 @@ function AccountPage() {
         {activeTab === "verification" && (
           <section className="account-card verification-card">
             <h2><ShieldCheck size={23} /> メール認証</h2>
-            <p>メールに届いた確認リンクを開くと、アカウントの本人確認が完了します。</p>
+            <p>メールに届いた6桁のパスコードを登録直後の認証画面で入力すると、アカウントの本人確認が完了します。</p>
             <div className={cx("verification-status", isEmailVerified && "is-verified")}>
               {isEmailVerified ? <Check size={22} /> : <Mail size={22} />}
               <div>
-                <strong>{isEmailVerified ? "認証済み" : verificationSent ? "確認メール送信済み" : "未認証"}</strong>
+                <strong>{isEmailVerified ? "認証済み" : verificationSent ? "パスコード送信済み" : "未認証"}</strong>
                 <span>{currentUser.email ?? "メールアドレス未設定"}</span>
               </div>
             </div>
             <button className="outline-wide" type="button" onClick={sendVerificationCode} disabled={sendingCode || isEmailVerified}>
-              {isEmailVerified ? "認証済み" : sendingCode ? "送信中..." : verificationSent ? "確認メールを再送信" : "確認メールを送信"}
+              {isEmailVerified ? "認証済み" : sendingCode ? "送信中..." : verificationSent ? "パスコードを再送信" : "パスコードを送信"}
             </button>
-            <small>確認後はログインし直すと認証状態が反映されます。メールが届かない場合は、迷惑メールフォルダを確認するか、時間を置いて再送信してください。</small>
+            <small>メールが届かない場合は、迷惑メールに分類されている可能性があります。迷惑メールフォルダを確認するか、時間を置いて再送信してください。</small>
           </section>
         )}
         <p className="account-note"><ShieldCheck size={20} /> ログイン情報とセッションは安全な認証基盤で管理されます。</p>

@@ -21,6 +21,7 @@ import {
   subscribeToAuthChanges,
   updateAuthPassword,
   updateProfileName,
+  verifyEmailOtp,
 } from "../services/authService";
 import { deleteBlob, loadSharedState, saveBlob, saveSharedState } from "../services/storageService";
 import type {
@@ -70,7 +71,8 @@ interface AppState {
   updateAccountName: (name: string) => Promise<void>;
   changePassword: (input: { currentPassword?: string; newPassword: string }) => Promise<void>;
   requestPasswordReset: (email: string) => Promise<void>;
-  resendEmailVerification: () => Promise<void>;
+  resendEmailVerification: (email?: string) => Promise<void>;
+  verifySignupEmailCode: (input: { email: string; code: string }) => Promise<void>;
   logout: () => Promise<void>;
   createRoom: (input: RoomInput) => Room;
   updateRoom: (roomId: string, patch: Partial<Room>) => void;
@@ -281,7 +283,7 @@ export const useAppStore = create<AppState>()(
 
       async register(input) {
         const user = await signUpWithEmail(input);
-        if (user) {
+        if (user?.emailVerified) {
           applyAuthenticatedUser(user, get().currentUser.id, set);
           syncSharedState(get);
         }
@@ -323,10 +325,16 @@ export const useAppStore = create<AppState>()(
         await requestPasswordResetEmail(email);
       },
 
-      async resendEmailVerification() {
-        const email = get().currentUser.email;
+      async resendEmailVerification(emailOverride) {
+        const email = emailOverride || get().currentUser.email;
         if (!email) throw new Error("メールアドレスが登録されていません。");
         await resendEmailVerification(email);
+      },
+
+      async verifySignupEmailCode(input) {
+        const user = await verifyEmailOtp({ email: input.email, token: input.code });
+        applyAuthenticatedUser(user, get().currentUser.id, set);
+        syncSharedState(get);
       },
 
       async logout() {
