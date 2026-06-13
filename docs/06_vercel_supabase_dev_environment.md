@@ -31,6 +31,7 @@ Output Directory: dist
 2. SQL Editorで `supabase/schema.sql` を実行する
 3. Storageに `slideroom-uploads` bucket が作られていることを確認する
 4. Vercelに環境変数を設定する
+5. AuthのConfirm signupメールテンプレートを6桁OTP用に変更する。手順は `docs/07_supabase_email_otp_template.md` を参照。
 
 ## 環境変数
 
@@ -73,4 +74,3 @@ GET    /api/blob/:key/download-url
 ```
 
 Vercel上ではPPTX本体をFunctions経由で送るとサイズ制限に当たりやすい。ブラウザはまず署名付きURLを取得し、Supabase Storageへ直接アップロードする。ローカルLANサーバーでは従来通り `/api/blob/:key` にfallbackする。
-

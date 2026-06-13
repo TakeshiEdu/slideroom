@@ -627,7 +627,7 @@ function AccountPage() {
       setVerificationSent(true);
       toast.success("6桁のパスコードを送信しました。メールを確認してください。");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "確認メールを送信できませんでした。");
+      toast.error(error instanceof Error ? error.message : "パスコードを送信できませんでした。");
     } finally {
       setSendingCode(false);
     }
