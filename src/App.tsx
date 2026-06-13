@@ -913,7 +913,6 @@ function CreateRoomPage() {
             <button className={cx("choice", accessMode === "authenticated" && "is-active")} type="button" onClick={() => setAccessMode("authenticated")}>
               <span className="radio-dot" /> ログインしているユーザーだけ参加可能
             </button>
-            {accessMode === "invite" && <PasscodePreview />}
           </div>
         </div>
         <button className="wide-primary" type="submit">ルームを作成</button>
@@ -1528,14 +1527,6 @@ function CopyField({ label, value }: { label: string; value: string }) {
         <button onClick={copy} type="button"><Copy size={20} /> コピー</button>
       </div>
     </label>
-  );
-}
-
-function PasscodePreview() {
-  return (
-    <div className="passcode-preview" aria-hidden="true">
-      {Array.from({ length: 6 }, (_, index) => <span key={index}>-</span>)}
-    </div>
   );
 }
 

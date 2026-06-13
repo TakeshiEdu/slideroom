@@ -1582,24 +1582,6 @@ button:disabled {
   border: 7px solid var(--blue);
 }
 
-.passcode-preview {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 14px;
-  padding: 10px 66px 4px;
-}
-
-.passcode-preview span {
-  display: grid;
-  place-items: center;
-  height: 64px;
-  border: 1.5px solid var(--line);
-  border-radius: 9px;
-  color: #99a8be;
-  font-size: 1.7rem;
-  font-weight: 800;
-}
-
 .input-with-icon {
   position: relative;
   display: block;
@@ -2355,15 +2337,6 @@ button:disabled {
   .input-with-icon input,
   .copy-field input {
     min-height: 58px;
-  }
-
-  .passcode-preview {
-    gap: 8px;
-    padding: 6px 0 0;
-  }
-
-  .passcode-preview span {
-    height: 54px;
   }
 
   .room-workspace,
