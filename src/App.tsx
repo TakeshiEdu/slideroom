@@ -12,7 +12,6 @@ import {
   FileText,
   FileUp,
   FolderPlus,
-  Globe2,
   House,
   KeyRound,
   ListOrdered,
@@ -564,12 +563,24 @@ function PasswordField({
 
 
 function MyRoomsPage() {
-  const { rooms, members, currentUser, logout } = useAppStore();
+  const { rooms, members, slides, currentUser, logout } = useAppStore();
   const myRoomIds = new Set(members.filter((member) => member.userId === currentUser.id).map((member) => member.roomId));
   const myRooms = rooms
     .filter((room) => room.hostUserId === currentUser.id || myRoomIds.has(room.id))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const recentRooms = myRooms.slice(0, 3);
+  const firstThumbnailByRoomId = useMemo(() => {
+    const map = new Map<string, string>();
+    [...slides]
+      .filter((slide) => slide.thumbnailUrl)
+      .sort((a, b) => a.order - b.order)
+      .forEach((slide) => {
+        if (!map.has(slide.roomId) && slide.thumbnailUrl) {
+          map.set(slide.roomId, slide.thumbnailUrl);
+        }
+      });
+    return map;
+  }, [slides]);
 
   function handleLogout() {
     logout();
@@ -607,14 +618,14 @@ function MyRoomsPage() {
           </div>
           <div className="room-card-list">
             {recentRooms.length > 0 ? (
-              recentRooms.map((room, index) => <MyRoomCard key={room.id} room={room} iconIndex={index} />)
+              recentRooms.map((room, index) => (
+                <MyRoomCard key={room.id} room={room} iconIndex={index} thumbnailUrl={firstThumbnailByRoomId.get(room.id)} />
+              ))
             ) : (
               <EmptyRoomPanel compact />
             )}
           </div>
         </section>
-        <EmptyRoomPanel />
-        <SyncFooter />
         <MobileBottomNav active="rooms" />
       </section>
     </main>
@@ -663,16 +674,6 @@ function EmptyRoomPanel({ compact }: { compact?: boolean }) {
         <PlusCircle size={22} /> 新しいルームを作る
       </button>
     </section>
-  );
-}
-
-function SyncFooter() {
-  return (
-    <footer className="sync-footer">
-      <span><Globe2 size={21} /> 自動保存 <b>ON</b></span>
-      <i />
-      <span>すべてのデータは同期されています。ルーム内のデータは24時間以内に削除されます。</span>
-    </footer>
   );
 }
 
@@ -822,19 +823,18 @@ function AccountPage() {
         </div>
       </section>
       {privacyOpen && <PrivacyPolicyModal onClose={() => setPrivacyOpen(false)} />}
-        <SyncFooter />
         <MobileBottomNav active="account" />
       </section>
     </main>
   );
 }
 
-function MyRoomCard({ room, iconIndex }: { room: Room; iconIndex: number }) {
+function MyRoomCard({ room, iconIndex, thumbnailUrl }: { room: Room; iconIndex: number; thumbnailUrl?: string }) {
   const { members } = useAppStore();
   const memberCount = members.filter((member) => member.roomId === room.id).length || 1;
   return (
     <button className="myroom-card" type="button" onClick={() => navigate(`/room/${room.id}`)}>
-      <RoomCover index={iconIndex} title={room.title} />
+      <RoomCover index={iconIndex} title={room.title} thumbnailUrl={thumbnailUrl} />
       <span className="myroom-body">
         <strong>{room.title}</strong>
         <span>{memberCount}人が参加中</span>
@@ -846,8 +846,15 @@ function MyRoomCard({ room, iconIndex }: { room: Room; iconIndex: number }) {
   );
 }
 
-function RoomCover({ index, title }: { index: number; title: string }) {
+function RoomCover({ index, title, thumbnailUrl }: { index: number; title: string; thumbnailUrl?: string }) {
   const theme = ["earth", "chart", "plant"][index % 3];
+  if (thumbnailUrl) {
+    return (
+      <span className="room-cover has-thumbnail">
+        <img src={thumbnailUrl} alt="" />
+      </span>
+    );
+  }
   return (
     <span className={cx("room-cover", `is-${theme}`)}>
       <b>{title}</b>
