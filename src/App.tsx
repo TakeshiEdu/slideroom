@@ -563,24 +563,13 @@ function PasswordField({
 
 
 function MyRoomsPage() {
-  const { rooms, members, slides, currentUser, logout } = useAppStore();
+  const { rooms, members, currentUser, logout } = useAppStore();
   const myRoomIds = new Set(members.filter((member) => member.userId === currentUser.id).map((member) => member.roomId));
   const myRooms = rooms
     .filter((room) => room.hostUserId === currentUser.id || myRoomIds.has(room.id))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const recentRooms = myRooms.slice(0, 3);
-  const firstThumbnailByRoomId = useMemo(() => {
-    const map = new Map<string, string>();
-    [...slides]
-      .filter((slide) => slide.thumbnailUrl)
-      .sort((a, b) => a.order - b.order)
-      .forEach((slide) => {
-        if (!map.has(slide.roomId) && slide.thumbnailUrl) {
-          map.set(slide.roomId, slide.thumbnailUrl);
-        }
-      });
-    return map;
-  }, [slides]);
+  const coverPreviews = useRoomCoverPreviewMap(recentRooms.map((room) => room.id));
 
   function handleLogout() {
     logout();
@@ -619,7 +608,7 @@ function MyRoomsPage() {
           <div className="room-card-list">
             {recentRooms.length > 0 ? (
               recentRooms.map((room, index) => (
-                <MyRoomCard key={room.id} room={room} iconIndex={index} thumbnailUrl={firstThumbnailByRoomId.get(room.id)} />
+                <MyRoomCard key={room.id} room={room} iconIndex={index} thumbnailSvg={coverPreviews[room.id]} />
               ))
             ) : (
               <EmptyRoomPanel compact />
@@ -829,12 +818,12 @@ function AccountPage() {
   );
 }
 
-function MyRoomCard({ room, iconIndex, thumbnailUrl }: { room: Room; iconIndex: number; thumbnailUrl?: string }) {
+function MyRoomCard({ room, iconIndex, thumbnailSvg }: { room: Room; iconIndex: number; thumbnailSvg?: string }) {
   const { members } = useAppStore();
   const memberCount = members.filter((member) => member.roomId === room.id).length || 1;
   return (
     <button className="myroom-card" type="button" onClick={() => navigate(`/room/${room.id}`)}>
-      <RoomCover index={iconIndex} title={room.title} thumbnailUrl={thumbnailUrl} />
+      <RoomCover index={iconIndex} title={room.title} thumbnailSvg={thumbnailSvg} />
       <span className="myroom-body">
         <strong>{room.title}</strong>
         <span>{memberCount}人が参加中</span>
@@ -846,13 +835,11 @@ function MyRoomCard({ room, iconIndex, thumbnailUrl }: { room: Room; iconIndex: 
   );
 }
 
-function RoomCover({ index, title, thumbnailUrl }: { index: number; title: string; thumbnailUrl?: string }) {
+function RoomCover({ index, title, thumbnailSvg }: { index: number; title: string; thumbnailSvg?: string }) {
   const theme = ["earth", "chart", "plant"][index % 3];
-  if (thumbnailUrl) {
+  if (thumbnailSvg) {
     return (
-      <span className="room-cover has-thumbnail">
-        <img src={thumbnailUrl} alt="" />
-      </span>
+      <span className="room-cover has-thumbnail" dangerouslySetInnerHTML={{ __html: thumbnailSvg }} />
     );
   }
   return (
@@ -1391,6 +1378,66 @@ function useSlidePreviewMap(roomId: string) {
   ]);
 
   return { previews, isLoading };
+}
+
+function useRoomCoverPreviewMap(roomIds: string[]) {
+  const { files, slides } = useAppStore();
+  const [previews, setPreviews] = useState<Record<string, string>>({});
+  const roomKey = roomIds.join("|");
+  const targetSlides = useMemo(() => {
+    const next = new Map<string, SlideItem>();
+    roomIds.forEach((roomId) => {
+      const firstSlide = slides
+        .filter((slide) => slide.roomId === roomId && slide.isPlaced)
+        .sort((a, b) => a.order - b.order)[0];
+      if (firstSlide) next.set(roomId, firstSlide);
+    });
+    return next;
+  }, [
+    roomKey,
+    slides.map((slide) => `${slide.id}:${slide.roomId}:${slide.fileId}:${slide.sourcePage}:${slide.order}:${slide.isPlaced}`).join("|"),
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      const next: Record<string, string> = {};
+      await Promise.all(Array.from(targetSlides.entries()).map(async ([roomId, slide]) => {
+        if (slide.thumbnailUrl) {
+          next[roomId] = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720"><image href="${slide.thumbnailUrl}" x="0" y="0" width="1280" height="720" preserveAspectRatio="xMidYMid slice"/></svg>`;
+          return;
+        }
+
+        const file = files.find((candidate) => candidate.id === slide.fileId);
+        if (file?.extension !== "pptx" || !file.storageKey) return;
+        const blob = await getBlob(file.storageKey);
+        if (!blob) return;
+        const svgs = await createPptxSlidePreviewSvgs(blob, [slide.sourcePage]);
+        const svg = svgs.get(slide.sourcePage);
+        if (svg) next[roomId] = svg;
+      }));
+
+      if (!cancelled) setPreviews(next);
+    }
+
+    setPreviews({});
+    if (targetSlides.size === 0) return;
+    load().catch((error) => {
+      console.warn("Room cover preview failed", error);
+      if (!cancelled) setPreviews({});
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    roomKey,
+    files.map((file) => `${file.id}:${file.storageKey ?? ""}:${file.updatedAt}`).join("|"),
+    Array.from(targetSlides.values()).map((slide) => `${slide.id}:${slide.fileId}:${slide.sourcePage}:${slide.thumbnailUrl ?? ""}`).join("|"),
+  ]);
+
+  return previews;
 }
 
 function DemoScreenshots() {
