@@ -3033,7 +3033,7 @@ button:disabled {
   .dashboard-shell {
     width: 100%;
     min-height: 100vh;
-    gap: 24px;
+    gap: 10px;
     border: 0;
     border-radius: 0;
     padding-bottom: 66px;
@@ -3042,7 +3042,7 @@ button:disabled {
 
   .app-top-nav {
     grid-template-columns: 1fr;
-    min-height: 66px;
+    min-height: 58px;
     border-bottom: 0;
     padding: 0 20px;
   }
