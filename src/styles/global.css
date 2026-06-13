@@ -2629,7 +2629,7 @@ button:disabled {
 /* Final dashboard overrides */
 .myrooms-page {
   min-height: 100vh;
-  padding: 28px;
+  padding: 44px;
   background:
     radial-gradient(circle at 20% 0%, rgba(185, 211, 255, 0.28), transparent 30%),
     linear-gradient(180deg, #fbfdff 0%, #f4f8ff 100%);
@@ -2639,8 +2639,8 @@ button:disabled {
   position: relative;
   display: grid;
   gap: 40px;
-  width: min(1180px, calc(100vw - 56px));
-  min-height: calc(100vh - 56px);
+  width: min(1060px, calc(100vw - 88px));
+  min-height: calc(100vh - 88px);
   margin: 0 auto;
   border: 1px solid #d8e2f2;
   border-radius: 18px;
@@ -2711,7 +2711,7 @@ button:disabled {
 .saved-rooms,
 .empty-room-panel,
 .account-panel {
-  width: min(1040px, calc(100% - 58px));
+  width: min(900px, calc(100% - 64px));
   margin-right: auto;
   margin-left: auto;
 }
