@@ -2638,7 +2638,7 @@ button:disabled {
 .dashboard-shell {
   position: relative;
   display: grid;
-  gap: 34px;
+  gap: 40px;
   width: min(1180px, calc(100vw - 56px));
   min-height: calc(100vh - 56px);
   margin: 0 auto;
@@ -2786,18 +2786,18 @@ button:disabled {
 .room-card-list {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
+  gap: 24px;
 }
 
 .myroom-card {
   position: relative;
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 12px;
+  gap: 16px;
   min-height: 0;
   border: 1px solid #dce5f2;
   border-radius: 10px;
-  padding: 14px;
+  padding: 20px;
   background: #ffffff;
   color: var(--navy);
   text-align: left;
@@ -3001,7 +3001,7 @@ button:disabled {
   .dashboard-shell {
     width: 100%;
     min-height: 100vh;
-    gap: 20px;
+    gap: 24px;
     border: 0;
     border-radius: 0;
     padding-bottom: 66px;
@@ -3063,14 +3063,14 @@ button:disabled {
 
   .room-card-list {
     grid-template-columns: 1fr;
-    gap: 12px;
+    gap: 14px;
   }
 
   .myroom-card {
     grid-template-columns: 118px minmax(0, 1fr) auto;
     align-items: center;
-    gap: 12px;
-    padding: 8px;
+    gap: 14px;
+    padding: 12px;
   }
 
   .room-cover {
