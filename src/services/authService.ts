@@ -1,7 +1,5 @@
-import { createClient, type SupabaseClient, type User as SupabaseUser } from "@supabase/supabase-js";
 import type { UserProfile } from "../types";
 
-let browserSupabase: SupabaseClient | undefined;
 const authRedirectNoticeKey = "slideroom-auth-redirect-notice";
 
 export interface AuthRedirectNotice {
@@ -9,51 +7,46 @@ export interface AuthRedirectNotice {
   message: string;
 }
 
+interface AuthResponse {
+  ok: boolean;
+  user?: UserProfile | null;
+  error?: string;
+}
+
+function canUseAuthApi() {
+  return typeof window !== "undefined" && window.location.protocol.startsWith("http");
+}
+
+function clearLegacySupabaseAuthStorage() {
+  if (typeof window === "undefined") return;
+  const keysToRemove: string[] = [];
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index);
+    if (!key) continue;
+    if (key.includes("supabase.auth.token") || /^sb-.+-auth-token$/.test(key)) {
+      keysToRemove.push(key);
+    }
+  }
+  keysToRemove.forEach((key) => window.localStorage.removeItem(key));
+}
+
+async function authFetch<T extends AuthResponse>(path: string, init: RequestInit = {}) {
+  if (!canUseAuthApi()) throw new Error("認証APIを利用できません。");
+  const response = await fetch(`/api/auth/${path}`, {
+    ...init,
+    credentials: "same-origin",
+    headers: {
+      "Content-Type": "application/json",
+      ...(init.headers ?? {}),
+    },
+  });
+  const payload = (await response.json()) as T;
+  if (!response.ok || !payload.ok) throw new Error(payload.error || `認証APIエラー: ${response.status}`);
+  return payload;
+}
+
 export function isAuthConfigured() {
-  return Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
-}
-
-export function getSupabaseBrowserClient() {
-  const url = import.meta.env.VITE_SUPABASE_URL;
-  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) {
-    throw new Error("認証設定が完了していません。管理者にお問い合わせください。");
-  }
-
-  if (!browserSupabase) {
-    browserSupabase = createClient(url, anonKey, {
-      auth: {
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-        persistSession: true,
-      },
-    });
-  }
-
-  return browserSupabase;
-}
-
-function displayNameFromUser(user: SupabaseUser) {
-  const metadataName = user.user_metadata?.display_name || user.user_metadata?.name;
-  if (typeof metadataName === "string" && metadataName.trim()) return metadataName.trim();
-  return user.email?.split("@")[0] || "ユーザー";
-}
-
-export function toUserProfile(user: SupabaseUser): UserProfile {
-  return {
-    id: user.id,
-    name: displayNameFromUser(user),
-    email: user.email,
-    avatarUrl: typeof user.user_metadata?.avatar_url === "string" ? user.user_metadata.avatar_url : undefined,
-    emailVerified: Boolean(user.email_confirmed_at || user.confirmed_at),
-  };
-}
-
-export async function getCurrentAuthUser() {
-  if (!isAuthConfigured()) return null;
-  const { data, error } = await getSupabaseBrowserClient().auth.getUser();
-  if (error || !data.user) return null;
-  return toUserProfile(data.user);
+  return canUseAuthApi();
 }
 
 function storeAuthRedirectNotice(notice: AuthRedirectNotice) {
@@ -90,7 +83,7 @@ function noticeFromRedirectParams(params: URLSearchParams): AuthRedirectNotice |
   if (normalized.toLowerCase().includes("other email")) {
     return {
       kind: "email-change-pending",
-      message: "片方のメールアドレスは確認できました。メールアドレス変更を完了するには、もう一方のメールに届いた確認リンクも開いてください。",
+      message: "もう一方のメールアドレスは確認できました。メールアドレス変更を完了するには、もう一方のメールに届いた確認リンクも開いてください。",
     };
   }
 
@@ -100,8 +93,13 @@ function noticeFromRedirectParams(params: URLSearchParams): AuthRedirectNotice |
   };
 }
 
+function authRedirectTo(path: string) {
+  return `${window.location.origin}/#/${path}`;
+}
+
 export async function recoverSessionFromRedirectHash() {
   if (!isAuthConfigured()) return;
+  clearLegacySupabaseAuthStorage();
   const hash = window.location.hash;
   const hashParams = new URLSearchParams(hash.replace(/^#/, ""));
   const notice = noticeFromRedirectParams(hashParams);
@@ -112,11 +110,8 @@ export async function recoverSessionFromRedirectHash() {
   const encodedFragment = hash.match(/%23(.+)$/)?.[1];
   const directFragment = hash.match(/#\/[^#]+#(.+)$/)?.[1];
   const authFragment = encodedFragment ? decodeURIComponent(encodedFragment) : directFragment;
-  const shouldRefreshSession = Boolean(notice);
   if (!authFragment || !authFragment.includes("access_token=")) {
-    if (shouldRefreshSession) {
-      const { data } = await getSupabaseBrowserClient().auth.getSession();
-      if (data.session) await getSupabaseBrowserClient().auth.refreshSession();
+    if (notice) {
       window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#/account`);
     }
     return;
@@ -127,106 +122,105 @@ export async function recoverSessionFromRedirectHash() {
   const refreshToken = params.get("refresh_token");
   if (!accessToken || !refreshToken) return;
 
-  const { error } = await getSupabaseBrowserClient().auth.setSession({
-    access_token: accessToken,
-    refresh_token: refreshToken,
+  await authFetch("session", {
+    method: "POST",
+    body: JSON.stringify({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      expires_in: Number(params.get("expires_in") || 3600),
+    }),
   });
-  if (error) throw error;
 
   const cleanHash = hash.replace(/%23.*$/i, "").replace(/#([^#]*)#.*$/, "#$1");
   window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${cleanHash}`);
 }
 
+export async function getCurrentAuthUser() {
+  if (!isAuthConfigured()) return null;
+  const payload = await authFetch<AuthResponse>("user", { method: "GET" });
+  return payload.user ?? null;
+}
+
 export async function signUpWithEmail(input: { name: string; email: string; password: string }) {
-  const { data, error } = await getSupabaseBrowserClient().auth.signUp({
-    email: input.email.trim().toLowerCase(),
-    password: input.password,
-    options: {
-      data: {
-        display_name: input.name.trim(),
-      },
-      emailRedirectTo: `${window.location.origin}/#/login`,
-    },
+  const payload = await authFetch<AuthResponse>("signup", {
+    method: "POST",
+    body: JSON.stringify({
+      ...input,
+      emailRedirectTo: authRedirectTo("login"),
+    }),
   });
-  if (error) throw error;
-  return data.user ? toUserProfile(data.user) : null;
+  return payload.user ?? null;
 }
 
 export async function verifyEmailOtp(input: { email: string; token: string }) {
-  const { data, error } = await getSupabaseBrowserClient().auth.verifyOtp({
-    type: "signup",
-    email: input.email.trim().toLowerCase(),
-    token: input.token.trim(),
+  const payload = await authFetch<AuthResponse>("verify-otp", {
+    method: "POST",
+    body: JSON.stringify(input),
   });
-  if (error) throw error;
-  if (!data.user) throw new Error("メール認証を完了できませんでした。");
-  return toUserProfile(data.user);
+  if (!payload.user) throw new Error("メール認証を完了できませんでした。");
+  return payload.user;
 }
 
 export async function signInWithEmail(input: { email: string; password: string }) {
-  const { data, error } = await getSupabaseBrowserClient().auth.signInWithPassword({
-    email: input.email.trim().toLowerCase(),
-    password: input.password,
+  const payload = await authFetch<AuthResponse>("login", {
+    method: "POST",
+    body: JSON.stringify(input),
   });
-  if (error) throw error;
-  if (!data.user) throw new Error("ログインできませんでした。");
-  return toUserProfile(data.user);
+  if (!payload.user) throw new Error("ログインできませんでした。");
+  return payload.user;
 }
 
 export async function signOut() {
   if (!isAuthConfigured()) return;
-  const { error } = await getSupabaseBrowserClient().auth.signOut();
-  if (error) throw error;
+  await authFetch("logout", { method: "POST", body: "{}" });
 }
 
 export async function updateProfileName(name: string) {
-  const { data, error } = await getSupabaseBrowserClient().auth.updateUser({
-    data: { display_name: name.trim() },
+  const payload = await authFetch<AuthResponse>("profile-name", {
+    method: "POST",
+    body: JSON.stringify({ name }),
   });
-  if (error) throw error;
-  if (!data.user) throw new Error("ユーザー情報を更新できませんでした。");
-  return toUserProfile(data.user);
+  if (!payload.user) throw new Error("ユーザー情報を更新できませんでした。");
+  return payload.user;
 }
 
 export async function updateAuthPassword(password: string) {
-  const { error } = await getSupabaseBrowserClient().auth.updateUser({ password });
-  if (error) throw error;
+  await authFetch("password", {
+    method: "POST",
+    body: JSON.stringify({ password }),
+  });
 }
 
 export async function requestEmailChange(newEmail: string) {
-  const { error } = await getSupabaseBrowserClient().auth.updateUser(
-    { email: newEmail.trim().toLowerCase() },
-    { emailRedirectTo: `${window.location.origin}/#/account` },
-  );
-  if (error) throw error;
+  await authFetch("email", {
+    method: "POST",
+    body: JSON.stringify({
+      email: newEmail,
+      emailRedirectTo: authRedirectTo("account"),
+    }),
+  });
 }
 
 export async function requestPasswordResetEmail(email: string) {
-  const { error } = await getSupabaseBrowserClient().auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-    redirectTo: `${window.location.origin}/#/reset-password`,
+  await authFetch("password-reset", {
+    method: "POST",
+    body: JSON.stringify({
+      email,
+      redirectTo: authRedirectTo("reset-password"),
+    }),
   });
-  if (error) throw error;
 }
 
 export async function resendEmailVerification(email: string) {
-  const { error } = await getSupabaseBrowserClient().auth.resend({
-    type: "signup",
-    email: email.trim().toLowerCase(),
-    options: {
-      emailRedirectTo: `${window.location.origin}/#/account`,
-    },
+  await authFetch("resend", {
+    method: "POST",
+    body: JSON.stringify({
+      email,
+      emailRedirectTo: authRedirectTo("account"),
+    }),
   });
-  if (error) throw error;
 }
 
-export function subscribeToAuthChanges(callback: (user: UserProfile | null) => void) {
-  if (!isAuthConfigured()) return () => undefined;
-
-  const {
-    data: { subscription },
-  } = getSupabaseBrowserClient().auth.onAuthStateChange((_event, session) => {
-    callback(session?.user ? toUserProfile(session.user) : null);
-  });
-
-  return () => subscription.unsubscribe();
+export function subscribeToAuthChanges(_callback: (user: UserProfile | null) => void) {
+  return () => undefined;
 }

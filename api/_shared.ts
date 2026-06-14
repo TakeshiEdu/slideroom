@@ -52,6 +52,18 @@ export function getSupabaseAdmin() {
   return cachedSupabase;
 }
 
+export function getSupabaseUrl() {
+  const url = process.env.SUPABASE_URL;
+  if (!url) throw new Error("Missing SUPABASE_URL");
+  return url.replace(/\/$/, "");
+}
+
+export function getSupabaseServerAnonKey() {
+  const key = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) throw new Error("Missing SUPABASE_ANON_KEY or SUPABASE_SERVICE_ROLE_KEY");
+  return key;
+}
+
 export function setApiHeaders(response: ServerResponse) {
   response.setHeader("Access-Control-Allow-Origin", "*");
   response.setHeader("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
@@ -98,6 +110,33 @@ export async function readRequestBody(request: IncomingMessage, maxBytes = MAX_U
   }
 
   return Buffer.concat(chunks);
+}
+
+export function getRequestCookies(request: IncomingMessage) {
+  const header = request.headers.cookie || "";
+  return Object.fromEntries(
+    header
+      .split(";")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((part) => {
+        const separatorIndex = part.indexOf("=");
+        if (separatorIndex === -1) return [decodeURIComponent(part), ""];
+        return [
+          decodeURIComponent(part.slice(0, separatorIndex)),
+          decodeURIComponent(part.slice(separatorIndex + 1)),
+        ];
+      }),
+  );
+}
+
+export function appendSetCookie(response: ServerResponse, cookie: string) {
+  const current = response.getHeader("Set-Cookie");
+  if (!current) {
+    response.setHeader("Set-Cookie", cookie);
+    return;
+  }
+  response.setHeader("Set-Cookie", Array.isArray(current) ? [...current, cookie] : [String(current), cookie]);
 }
 
 function getRoomCreatedAt(room: RoomLike) {
