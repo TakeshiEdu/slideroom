@@ -1262,10 +1262,11 @@ function OrderPage({ room }: { room: Room }) {
         <p>上下ボタンでスライドの順番を並び替えられます。</p>
         <div className="top-actions">
           <button className="secondary-action" onClick={() => navigate(`/room/${room.id}/preview`)}>
-            <Eye size={24} /> 繝励Ξ繝薙Η繝ｼ
+            <Eye size={24} /> プレビュー
           </button>
           <button className="primary-action" onClick={saveOrder}>
-            <Save size={24} /> 鬆・分繧剃ｿ晏ｭ・          </button>
+            <Save size={24} /> 順番を保存
+          </button>
         </div>
         <section className="file-order-panel">
           <div className="section-title-row">
