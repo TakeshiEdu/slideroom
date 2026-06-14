@@ -23,6 +23,7 @@ import {
   Save,
   Settings,
   ShieldCheck,
+  Trash2,
   Upload,
   User,
   Users,
@@ -1199,11 +1200,15 @@ function MemberRow({ member }: { member: RoomMember }) {
 }
 
 function OrderPage({ room }: { room: Room }) {
-  const { slides, reorderSlides } = useAppStore();
+  const { files, slides, reorderSlides } = useAppStore();
   const { previews, isLoading } = useSlidePreviewMap(room.id);
   const placedSlides = useMemo(
     () => slides.filter((slide) => slide.roomId === room.id && slide.isPlaced).sort((a, b) => a.order - b.order),
     [slides, room.id],
+  );
+  const roomFiles = useMemo(
+    () => files.filter((file) => file.roomId === room.id && file.status !== "excluded"),
+    [files, room.id],
   );
   const [orderedIds, setOrderedIds] = useState<string[]>(() => placedSlides.map((slide) => slide.id));
 
@@ -1212,6 +1217,20 @@ function OrderPage({ room }: { room: Room }) {
   }, [placedSlides.map((slide) => slide.id).join("|")]);
 
   const orderedSlides = orderedIds.map((id) => placedSlides.find((slide) => slide.id === id)).filter((slide): slide is SlideItem => Boolean(slide));
+  const orderedFileGroups = useMemo(() => {
+    const groups = new Map<string, { file: SubmittedFile; slides: SlideItem[] }>();
+    orderedSlides.forEach((slide) => {
+      const file = roomFiles.find((candidate) => candidate.id === slide.fileId);
+      if (!file) return;
+      const current = groups.get(file.id);
+      if (current) {
+        current.slides.push(slide);
+      } else {
+        groups.set(file.id, { file, slides: [slide] });
+      }
+    });
+    return Array.from(groups.values());
+  }, [orderedSlides, roomFiles]);
 
   function move(index: number, direction: -1 | 1) {
     const nextIndex = index + direction;
@@ -1219,6 +1238,14 @@ function OrderPage({ room }: { room: Room }) {
     const next = [...orderedIds];
     [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
     setOrderedIds(next);
+  }
+
+  function moveFileBlock(index: number, direction: -1 | 1) {
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= orderedFileGroups.length) return;
+    const nextGroups = orderedFileGroups.map((group) => group.slides.map((slide) => slide.id));
+    [nextGroups[index], nextGroups[nextIndex]] = [nextGroups[nextIndex], nextGroups[index]];
+    setOrderedIds(nextGroups.flat());
   }
 
   function saveOrder() {
@@ -1233,6 +1260,31 @@ function OrderPage({ room }: { room: Room }) {
         <BackButton room={room} inline />
         <h1>スライド順番</h1>
         <p>上下ボタンでスライドの順番を並び替えられます。</p>
+        <section className="file-order-panel">
+          <div className="section-title-row">
+            <h2>PPTXファイル単位の順番</h2>
+            <span>{orderedFileGroups.length}件</span>
+          </div>
+          <div className="file-order-list">
+            {orderedFileGroups.length === 0 ? (
+              <EmptyInline text="並び替えできるファイルがありません。" />
+            ) : (
+              orderedFileGroups.map((group, index) => (
+                <div className="file-order-row" key={group.file.id}>
+                  <span className="ppt-icon"><FileText size={21} /></span>
+                  <div>
+                    <strong>{group.file.name}</strong>
+                    <small>{group.slides.length}枚</small>
+                  </div>
+                  <div className="row-buttons">
+                    <button onClick={() => moveFileBlock(index, -1)} disabled={index === 0} aria-label="ファイルを上へ"><ArrowUp size={21} /></button>
+                    <button onClick={() => moveFileBlock(index, 1)} disabled={index === orderedFileGroups.length - 1} aria-label="ファイルを下へ"><ArrowDown size={21} /></button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
         <div className="order-list">
           {orderedSlides.map((slide, index) => (
             <div className="order-row" key={slide.id}>
@@ -1692,11 +1744,30 @@ function StepCard({ number, icon, title, text }: { number: string; icon: ReactNo
 }
 
 function FileRow({ file }: { file: SubmittedFile }) {
+  const { removeFile } = useAppStore();
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDelete() {
+    const confirmed = window.confirm(`${file.name} を削除しますか？このファイルに含まれるスライドも順番リストから削除されます。`);
+    if (!confirmed) return;
+    setDeleting(true);
+    try {
+      await removeFile(file.id);
+      toast.success("ファイルを削除しました。");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "ファイルを削除できませんでした。");
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className="file-row-simple">
       <span className="ppt-icon"><FileText size={22} /></span>
       <strong>{file.name}</strong>
       <small>{file.slideCount}枚 ・ {formatFileSize(file.size)}</small>
+      <button className="icon-danger-button" type="button" onClick={handleDelete} disabled={deleting} aria-label="ファイルを削除">
+        <Trash2 size={20} />
+      </button>
     </div>
   );
 }

@@ -1839,7 +1839,7 @@ button:disabled {
 
 .file-row-simple {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 14px;
   min-height: 64px;
@@ -1869,6 +1869,22 @@ button:disabled {
 .file-row-simple small {
   color: var(--muted);
   font-weight: 800;
+}
+
+.icon-danger-button {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fff7f7;
+  color: #dc2626;
+}
+
+.icon-danger-button:disabled {
+  cursor: wait;
+  opacity: 0.55;
 }
 
 .empty-inline {
@@ -1901,6 +1917,51 @@ button:disabled {
   border: 1px solid var(--line);
   border-radius: 12px;
   overflow: hidden;
+}
+
+.file-order-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.file-order-list {
+  display: grid;
+  gap: 10px;
+}
+
+.file-order-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  min-height: 68px;
+  border: 1px solid var(--soft-line);
+  border-radius: 9px;
+  padding: 12px 16px;
+  background: #ffffff;
+}
+
+.file-order-row > div:first-of-type {
+  min-width: 0;
+}
+
+.file-order-row strong,
+.file-order-row small {
+  display: block;
+}
+
+.file-order-row strong {
+  overflow: hidden;
+  color: var(--navy);
+  font-weight: 950;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-order-row small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-weight: 800;
 }
 
 .order-row {
@@ -2453,13 +2514,24 @@ button:disabled {
   }
 
   .file-row-simple {
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, 1fr) auto;
     min-height: 56px;
   }
 
   .file-row-simple small {
     grid-column: 2;
     margin-top: -8px;
+  }
+
+  .file-row-simple .icon-danger-button {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
+
+  .file-order-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 10px;
+    padding: 10px;
   }
 
   .order-row {
