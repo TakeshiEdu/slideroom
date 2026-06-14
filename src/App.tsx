@@ -1053,9 +1053,10 @@ function CreateRoomPage() {
 }
 
 function JoinRoomPage({ inviteCode }: { inviteCode?: string }) {
-  const { joinRoom, syncFromServer } = useAppStore();
+  const { currentUser, isAuthenticated, joinRoom, syncFromServer } = useAppStore();
   const [name, setName] = useState("");
   const [code, setCode] = useState(inviteCode?.toUpperCase() ?? "");
+  const joinedName = isAuthenticated ? currentUser.name : name;
 
   useEffect(() => {
     if (inviteCode) setCode(inviteCode.toUpperCase());
@@ -1064,7 +1065,7 @@ function JoinRoomPage({ inviteCode }: { inviteCode?: string }) {
   async function submit(event: FormEvent) {
     event.preventDefault();
     await syncFromServer();
-    const result = joinRoom(code, name);
+    const result = joinRoom(code, joinedName);
     if (result.error || !result.room) {
       toast.error(result.error ?? "参加できませんでした。");
       return;
@@ -1078,10 +1079,20 @@ function JoinRoomPage({ inviteCode }: { inviteCode?: string }) {
       <CenteredBrand />
       <form className="form-card compact" onSubmit={submit}>
         <h1>ルームに参加</h1>
-        <label className="input-with-icon">
-          <User size={22} />
-          <input value={name} onChange={(event) => setName(event.target.value)} placeholder="ユーザーネーム" />
-        </label>
+        {isAuthenticated ? (
+          <div className="join-user-card">
+            <span className="user-avatar">{currentUser.name.trim().charAt(0) || "U"}</span>
+            <div>
+              <strong>{currentUser.name}</strong>
+              <small>この名前で参加します</small>
+            </div>
+          </div>
+        ) : (
+          <label className="input-with-icon">
+            <User size={22} />
+            <input value={name} onChange={(event) => setName(event.target.value)} placeholder="ユーザーネーム" />
+          </label>
+        )}
         <label className="input-with-icon">
           <Lock size={22} />
           <input value={code} onChange={(event) => setCode(event.target.value.toUpperCase())} placeholder="6ケタパスワード" />

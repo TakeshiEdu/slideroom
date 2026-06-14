@@ -1075,6 +1075,35 @@ button:disabled {
   width: 100%;
 }
 
+.join-user-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  min-height: 72px;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 18px;
+  background: #f8fbff;
+}
+
+.join-user-card strong,
+.join-user-card small {
+  display: block;
+}
+
+.join-user-card strong {
+  color: var(--navy);
+  font-weight: 950;
+}
+
+.join-user-card small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 850;
+}
+
 .steps-block {
   width: min(960px, calc(100% - 52px));
   margin: 0 auto 18px;
@@ -3047,6 +3076,38 @@ button:disabled {
 
 .mobile-bottom-nav {
   display: none;
+}
+
+@media (min-width: 861px) {
+  .simple-page:not(.wide) {
+    width: min(1060px, calc(100vw - 88px));
+    min-height: calc(100vh - 88px);
+    margin: 44px auto;
+    padding: 44px 64px 58px;
+    border: 1px solid #d8e2f2;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 22px 58px rgba(31, 54, 86, 0.1);
+  }
+
+  .simple-page:not(.wide) .centered-brand {
+    margin-bottom: 16px;
+  }
+
+  .simple-page:not(.wide) .form-card {
+    width: min(680px, 100%);
+    margin-top: 12px;
+  }
+
+  .simple-page:not(.wide) .form-card.compact {
+    width: min(520px, 100%);
+    margin-top: 30px;
+  }
+
+  .simple-page:not(.wide) .form-card h1 {
+    margin-bottom: 12px;
+    font-size: clamp(3rem, 5vw, 4.4rem);
+  }
 }
 
 .account-panel.account-panel-v2 {
