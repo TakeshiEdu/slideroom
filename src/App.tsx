@@ -728,7 +728,6 @@ function AccountPage() {
     resendEmailVerification,
     logout,
   } = useAppStore();
-  const [activeTab, setActiveTab] = useState<"settings" | "verification">("settings");
   const [name, setName] = useState(currentUser.name);
   const [newEmail, setNewEmail] = useState("");
   const [emailChangeSent, setEmailChangeSent] = useState(false);
@@ -739,6 +738,11 @@ function AccountPage() {
   const [sendingCode, setSendingCode] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [authNotice, setAuthNotice] = useState<AuthRedirectNotice | null>(null);
+  const [editingPanel, setEditingPanel] = useState<"name" | "email" | null>(null);
+
+  useEffect(() => {
+    setName(currentUser.name);
+  }, [currentUser.name]);
 
   useEffect(() => {
     const notice = consumeAuthRedirectNotice();
@@ -759,6 +763,7 @@ function AccountPage() {
     setSavingName(true);
     try {
       await updateAccountName(name);
+      setEditingPanel(null);
       toast.success("ユーザー名を更新しました。");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "ユーザー名を更新できませんでした。");
@@ -777,6 +782,7 @@ function AccountPage() {
       await requestEmailChange(nextEmail);
       setEmailChangeSent(true);
       setNewEmail("");
+      setEditingPanel(null);
       toast.success("確認メールを送信しました。");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "確認メールを送信できませんでした。");
@@ -822,43 +828,112 @@ function AccountPage() {
     <main className="myrooms-page">
       <section className="dashboard-shell">
         <AppTopNav active="account" onLogout={handleLogout} />
-      <section className="account-panel">
-        <div className="account-head">
-          <span className="user-avatar large">{currentUser.name.trim().charAt(0) || "U"}</span>
-          <div>
-            <h1>マイページ</h1>
-            <p>アカウント情報、メール認証、パスワードを管理できます。</p>
+        <section className="account-panel account-panel-v2">
+          <h1 className="account-mobile-title">マイページ</h1>
+          <div className="account-layout">
+            <aside className="account-profile-card">
+              <span className="user-avatar account-avatar">{currentUser.name.trim().charAt(0) || "U"}</span>
+              <strong>{currentUser.name}</strong>
+              <span>{currentUser.email ?? "メールアドレス未設定"}</span>
+              <em className={cx("mail-status-badge", isEmailVerified && "is-verified")}>
+                {isEmailVerified ? <Check size={16} /> : <Mail size={16} />}
+                {isEmailVerified ? "メール認証済み" : verificationSent ? "パスコード送信済み" : "メール未認証"}
+              </em>
+            </aside>
+
+            <section className="account-settings-card">
+              {authNotice && (
+                <div className={cx("auth-message-box", "account-redirect-notice", authNotice.kind === "error" && "is-error", authNotice.kind === "email-change-pending" && "is-warning")} role="status">
+                  {authNotice.kind === "error" ? <X size={24} /> : <Mail size={24} />}
+                  <div>
+                    <strong>{authNotice.kind === "email-change-pending" ? "もう一方の確認メールも開いてください" : "確認リンクを受け付けました"}</strong>
+                    <p>{authNotice.message}</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="account-section">
+                <h2>アカウント</h2>
+                <div className="account-setting-row">
+                  <span>表示名</span>
+                  <strong>{currentUser.name}</strong>
+                  <button className="outline-mini" type="button" onClick={() => setEditingPanel("name")}>編集</button>
+                </div>
+              </div>
+
+              <div className="account-section">
+                <h2>メールアドレス</h2>
+                <div className="account-setting-row">
+                  <span>メールアドレス</span>
+                  <strong>{currentUser.email ?? "未設定"}</strong>
+                  <button className="outline-mini" type="button" onClick={() => setEditingPanel("email")}>変更する</button>
+                </div>
+                <p className="account-inline-help">現在のメールアドレスと新しいメールアドレスの両方に確認リンクを送信します。両方のリンクを開くまで、メールアドレスは変更されません。</p>
+                {!isEmailVerified && (
+                  <button className="account-text-action" type="button" onClick={sendVerificationCode} disabled={sendingCode}>
+                    {sendingCode ? "送信中..." : verificationSent ? "パスコードを再送信" : "メール認証パスコードを送信"}
+                  </button>
+                )}
+                {emailChangeSent && (
+                  <div className="auth-message-box" role="status">
+                    <Mail size={24} />
+                    <div>
+                      <strong>確認メールを送信しました</strong>
+                      <p>現在のメールアドレスと新しいメールアドレスに届いた確認リンクを両方開くと変更が完了します。届かない場合は迷惑メールフォルダも確認してください。</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="account-section">
+                <h2>パスワード</h2>
+                <div className="account-setting-row">
+                  <span>登録メールに再設定リンクを送信します。</span>
+                  <strong />
+                  <button className="outline-mini" type="button" onClick={sendPasswordReset} disabled={sendingPasswordReset || !currentUser.email}>
+                    {sendingPasswordReset ? "送信中..." : "再設定メールを送信"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="account-section account-section-other">
+                <h2>その他</h2>
+                <button className="account-link-row" type="button" onClick={() => setPrivacyOpen(true)}>
+                  <span>プライバシーポリシー</span>
+                  <ArrowRight size={22} />
+                </button>
+                <button className="account-link-row" type="button" onClick={handleLogout}>
+                  <span>ログアウト</span>
+                  <ArrowRight size={22} />
+                </button>
+              </div>
+            </section>
           </div>
-        </div>
-        <div className="account-tabs" role="tablist" aria-label="アカウントメニュー">
-          <button className={cx(activeTab === "settings" && "is-active")} type="button" role="tab" aria-selected={activeTab === "settings"} onClick={() => setActiveTab("settings")}>
-            <Settings size={20} /> アカウント設定
-          </button>
-          <button className={cx(activeTab === "verification" && "is-active")} type="button" role="tab" aria-selected={activeTab === "verification"} onClick={() => setActiveTab("verification")}>
-            <ShieldCheck size={20} /> ユーザー認証
-          </button>
-        </div>
-        {authNotice && (
-          <div className={cx("auth-message-box", "account-redirect-notice", authNotice.kind === "error" && "is-error", authNotice.kind === "email-change-pending" && "is-warning")} role="status">
-            {authNotice.kind === "error" ? <X size={24} /> : <Mail size={24} />}
-            <div>
-              <strong>{authNotice.kind === "email-change-pending" ? "もう一方の確認メールも開いてください" : authNotice.kind === "email-change-complete" ? "確認リンクを受け付けました" : "確認リンクを受け付けました"}</strong>
-              <p>{authNotice.message}</p>
-            </div>
-          </div>
-        )}
-        {activeTab === "settings" && (
-          <>
-            <form className="account-card" onSubmit={saveName}>
-              <h2><User size={23} /> ユーザー名</h2>
+        </section>
+
+        {editingPanel === "name" && (
+          <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="表示名を編集">
+            <form className="account-edit-modal" onSubmit={saveName}>
+              <button className="modal-close" type="button" onClick={() => setEditingPanel(null)} aria-label="閉じる">
+                <X size={22} />
+              </button>
+              <h2>表示名を編集</h2>
               <label className="auth-field">
                 <span>表示名</span>
                 <input value={name} onChange={(event) => setName(event.target.value)} placeholder="ユーザー名" />
               </label>
-              <button className="wide-primary" type="submit" disabled={savingName}>{savingName ? "保存中..." : "ユーザー名を保存"}</button>
+              <button className="wide-primary" type="submit" disabled={savingName}>{savingName ? "保存中..." : "保存する"}</button>
             </form>
-            <form className="account-card" onSubmit={sendEmailChange}>
-              <h2><Mail size={23} /> メールアドレス変更</h2>
+          </div>
+        )}
+
+        {editingPanel === "email" && (
+          <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="メールアドレスを変更">
+            <form className="account-edit-modal" onSubmit={sendEmailChange}>
+              <button className="modal-close" type="button" onClick={() => setEditingPanel(null)} aria-label="閉じる">
+                <X size={22} />
+              </button>
+              <h2>メールアドレスを変更</h2>
               <p className="account-card-help">現在のメールアドレスと新しいメールアドレスの両方に確認リンクを送信します。両方のリンクを開くまで、メールアドレスは変更されません。</p>
               <label className="auth-field">
                 <span>現在のメールアドレス</span>
@@ -868,53 +943,12 @@ function AccountPage() {
                 <span>新しいメールアドレス</span>
                 <input value={newEmail} onChange={(event) => setNewEmail(event.target.value)} type="email" placeholder="new@example.com" />
               </label>
-              {emailChangeSent && (
-                <div className="auth-message-box" role="status">
-                  <Mail size={24} />
-                  <div>
-                    <strong>確認メールを送信しました</strong>
-                    <p>現在のメールアドレスと新しいメールアドレスに届いた確認リンクを両方開くと変更が完了します。届かない場合は迷惑メールフォルダも確認してください。</p>
-                  </div>
-                </div>
-              )}
               <button className="wide-primary" type="submit" disabled={sendingEmailChange}>{sendingEmailChange ? "送信中..." : "確認メールを送信"}</button>
             </form>
-            <section className="account-card">
-              <h2><KeyRound size={23} /> パスワード変更</h2>
-              <p className="account-card-help">登録メールアドレスに再設定リンクを送信します。リンクを開いた後に新しいパスワードを設定できます。</p>
-              <button className="wide-primary" type="button" onClick={sendPasswordReset} disabled={sendingPasswordReset || !currentUser.email}>
-                {sendingPasswordReset ? "送信中..." : "パスワード再設定メールを送信"}
-              </button>
-            </section>
-          </>
+          </div>
         )}
-        {activeTab === "verification" && (
-          <section className="account-card verification-card">
-            <h2><ShieldCheck size={23} /> メール認証</h2>
-            <p>メールに届いた6桁のパスコードを登録直後の認証画面で入力すると、アカウントの本人確認が完了します。</p>
-            <div className={cx("verification-status", isEmailVerified && "is-verified")}>
-              {isEmailVerified ? <Check size={22} /> : <Mail size={22} />}
-              <div>
-                <strong>{isEmailVerified ? "認証済み" : verificationSent ? "パスコード送信済み" : "未認証"}</strong>
-                <span>{currentUser.email ?? "メールアドレス未設定"}</span>
-              </div>
-            </div>
-            <button className="outline-wide" type="button" onClick={sendVerificationCode} disabled={sendingCode || isEmailVerified}>
-              {isEmailVerified ? "認証済み" : sendingCode ? "送信中..." : verificationSent ? "パスコードを再送信" : "パスコードを送信"}
-            </button>
-            <small>メールが届かない場合は、迷惑メールに分類されている可能性があります。迷惑メールフォルダを確認するか、時間を置いて再送信してください。</small>
-          </section>
-        )}
-        <div className="account-note">
-          <ShieldCheck size={20} />
-          <p>
-            アカウント情報、アップロードファイル、ルームデータの扱いは
-            <button type="button" onClick={() => setPrivacyOpen(true)}>プライバシーポリシー</button>
-            に記載しています。
-          </p>
-        </div>
-      </section>
-      {privacyOpen && <PrivacyPolicyModal onClose={() => setPrivacyOpen(false)} />}
+
+        {privacyOpen && <PrivacyPolicyModal onClose={() => setPrivacyOpen(false)} />}
         <MobileBottomNav active="account" />
       </section>
     </main>

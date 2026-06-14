@@ -2752,7 +2752,7 @@ button:disabled {
 }
 
 .top-icon-button {
-  display: grid;
+  display: none;
   justify-self: end;
   place-items: center;
   width: 42px;
@@ -3049,6 +3049,225 @@ button:disabled {
   display: none;
 }
 
+.account-panel.account-panel-v2 {
+  width: min(980px, calc(100% - 64px));
+  margin: 8px auto 36px;
+}
+
+.account-mobile-title {
+  display: none;
+}
+
+.account-layout {
+  display: grid;
+  grid-template-columns: minmax(230px, 290px) minmax(0, 1fr);
+  gap: 34px;
+  align-items: start;
+}
+
+.account-profile-card,
+.account-settings-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 14px 36px rgba(31, 54, 86, 0.06);
+}
+
+.account-profile-card {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 34px 24px 42px;
+  text-align: center;
+}
+
+.account-avatar {
+  width: 88px;
+  height: 88px;
+  margin-bottom: 8px;
+  font-size: 2rem;
+}
+
+.account-profile-card strong {
+  color: var(--navy);
+  font-size: 1.55rem;
+  font-weight: 950;
+}
+
+.account-profile-card > span:not(.user-avatar) {
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-style: normal;
+  font-weight: 850;
+  word-break: break-all;
+}
+
+.mail-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  border: 1px solid #ffd59b;
+  border-radius: 999px;
+  padding: 0 12px;
+  background: #fff7e8;
+  color: #9a5b00;
+  font-size: 0.82rem;
+  font-style: normal;
+  font-weight: 950;
+}
+
+.mail-status-badge.is-verified {
+  border-color: #bde8c7;
+  background: #ecfbf0;
+  color: #14823a;
+}
+
+.account-settings-card {
+  display: grid;
+  gap: 0;
+  padding: 30px 40px;
+}
+
+.account-section {
+  display: grid;
+  gap: 14px;
+  border-bottom: 1px solid var(--soft-line);
+  padding: 24px 0;
+}
+
+.account-section:first-child {
+  padding-top: 0;
+}
+
+.account-section:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.account-section h2 {
+  margin: 0 0 8px;
+  color: var(--navy);
+  font-size: 1.28rem;
+  font-weight: 950;
+}
+
+.account-setting-row {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+}
+
+.account-setting-row span {
+  color: var(--navy);
+  font-weight: 850;
+}
+
+.account-setting-row strong {
+  min-width: 0;
+  color: var(--navy);
+  font-size: 0.98rem;
+  font-weight: 950;
+  overflow-wrap: anywhere;
+}
+
+.outline-mini {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 112px;
+  min-height: 38px;
+  border: 1.5px solid var(--blue);
+  border-radius: 6px;
+  padding: 0 18px;
+  background: #ffffff;
+  color: var(--blue);
+  font-weight: 950;
+}
+
+.outline-mini:disabled,
+.account-text-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.account-inline-help {
+  margin: -6px 0 0 188px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 850;
+  line-height: 1.55;
+}
+
+.account-text-action {
+  justify-self: start;
+  margin-left: 188px;
+  border: 0;
+  background: transparent;
+  color: var(--blue);
+  font-weight: 950;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.account-section-other {
+  gap: 0;
+}
+
+.account-link-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  min-height: 56px;
+  border: 0;
+  border-top: 1px solid var(--soft-line);
+  padding: 0;
+  background: transparent;
+  color: var(--navy);
+  font-weight: 950;
+  text-align: left;
+}
+
+.account-link-row:first-of-type {
+  border-top: 0;
+}
+
+.account-link-row svg {
+  color: var(--navy);
+}
+
+.account-edit-modal {
+  position: relative;
+  display: grid;
+  gap: 20px;
+  width: min(520px, 100%);
+  border-radius: 16px;
+  padding: 34px;
+  background: #ffffff;
+  box-shadow: var(--shadow);
+}
+
+.account-edit-modal h2 {
+  margin: 0;
+  color: var(--navy);
+  font-size: 1.7rem;
+}
+
+.modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+}
+
 @media (max-width: 760px) {
   .myrooms-page {
     padding: 0;
@@ -3085,6 +3304,146 @@ button:disabled {
   .empty-room-panel,
   .account-panel {
     width: min(100%, calc(100vw - 50px));
+  }
+
+  .account-panel.account-panel-v2 {
+    width: min(100%, calc(100vw - 44px));
+    margin: 12px auto 20px;
+  }
+
+  .account-mobile-title {
+    display: block;
+    margin: 0;
+    color: var(--navy);
+    font-size: 1.95rem;
+    line-height: 1.1;
+  }
+
+  .account-layout {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .account-profile-card {
+    grid-template-columns: auto minmax(0, 1fr);
+    justify-items: start;
+    align-items: center;
+    gap: 4px 14px;
+    padding: 16px;
+    text-align: left;
+  }
+
+  .account-avatar {
+    grid-row: span 3;
+    width: 70px;
+    height: 70px;
+    margin: 0;
+    font-size: 1.55rem;
+  }
+
+  .account-profile-card strong {
+    font-size: 1.22rem;
+  }
+
+  .mail-status-badge {
+    min-height: 24px;
+    padding: 0 9px;
+    font-size: 0.74rem;
+  }
+
+  .account-settings-card {
+    gap: 22px;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .account-section {
+    gap: 10px;
+    border: 0;
+    padding: 0;
+  }
+
+  .account-section h2 {
+    margin: 0;
+    font-size: 1.05rem;
+  }
+
+  .account-setting-row,
+  .account-link-row {
+    min-height: 54px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px 16px;
+    background: #ffffff;
+    box-shadow: 0 8px 20px rgba(31, 54, 86, 0.06);
+  }
+
+  .account-setting-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 12px;
+  }
+
+  .account-setting-row span {
+    grid-column: 1 / -1;
+    font-size: 0.84rem;
+  }
+
+  .account-setting-row strong {
+    font-size: 0.9rem;
+  }
+
+  .outline-mini {
+    min-width: 0;
+    min-height: 30px;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--blue);
+    font-size: 0.82rem;
+  }
+
+  .outline-mini::after,
+  .account-link-row::after {
+    margin-left: 10px;
+    color: var(--navy);
+    content: "›";
+    font-size: 1.4rem;
+    line-height: 1;
+  }
+
+  .account-inline-help {
+    margin: -2px 0 0;
+    padding: 0 16px;
+    font-size: 0.75rem;
+  }
+
+  .account-text-action {
+    margin-left: 0;
+    padding: 0 16px;
+    font-size: 0.82rem;
+  }
+
+  .account-section-other {
+    gap: 10px;
+  }
+
+  .account-section-other .account-link-row {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: 0 8px 20px rgba(31, 54, 86, 0.06);
+  }
+
+  .account-link-row svg {
+    display: none;
+  }
+
+  .account-edit-modal {
+    align-self: end;
+    width: 100%;
+    border-radius: 18px 18px 0 0;
+    padding: 30px 22px;
   }
 
   .myrooms-hero {
