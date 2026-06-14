@@ -1260,6 +1260,13 @@ function OrderPage({ room }: { room: Room }) {
         <BackButton room={room} inline />
         <h1>スライド順番</h1>
         <p>上下ボタンでスライドの順番を並び替えられます。</p>
+        <div className="top-actions">
+          <button className="secondary-action" onClick={() => navigate(`/room/${room.id}/preview`)}>
+            <Eye size={24} /> 繝励Ξ繝薙Η繝ｼ
+          </button>
+          <button className="primary-action" onClick={saveOrder}>
+            <Save size={24} /> 鬆・分繧剃ｿ晏ｭ・          </button>
+        </div>
         <section className="file-order-panel">
           <div className="section-title-row">
             <h2>PPTXファイル単位の順番</h2>

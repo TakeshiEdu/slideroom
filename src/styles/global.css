@@ -1023,6 +1023,7 @@ button:disabled {
 
 .hero-actions,
 .bottom-actions,
+.top-actions,
 .room-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1034,6 +1035,11 @@ button:disabled {
 .room-actions {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   width: 100%;
+}
+
+.top-actions {
+  margin-top: 8px;
+  margin-bottom: 8px;
 }
 
 .primary-action,
@@ -2321,6 +2327,7 @@ button:disabled {
 
   .hero-actions,
   .bottom-actions,
+  .top-actions,
   .room-actions,
   .share-grid,
   .step-grid,
@@ -2331,6 +2338,7 @@ button:disabled {
 
   .hero-actions,
   .bottom-actions,
+  .top-actions,
   .room-actions {
     gap: 14px;
   }
@@ -2561,7 +2569,8 @@ button:disabled {
     height: 40px;
   }
 
-  .bottom-actions {
+  .bottom-actions,
+  .top-actions {
     margin-top: 0;
   }
 
