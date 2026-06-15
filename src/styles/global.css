@@ -3938,10 +3938,12 @@ button:disabled {
 
 .account-profile-card {
   position: relative;
+  align-content: start;
   min-height: 100%;
   overflow: hidden;
   border-color: #d9e6f6;
   border-radius: 14px;
+  gap: 6px;
   padding: 44px 28px 54px;
   background:
     radial-gradient(circle at 74% 34%, rgba(111, 211, 164, 0.12), transparent 18%),
@@ -3985,6 +3987,11 @@ button:disabled {
   box-shadow: 0 12px 30px rgba(31, 54, 86, 0.08);
   color: var(--blue);
   font-size: 2.35rem;
+  margin-bottom: 2px;
+}
+
+.account-profile-card .mail-status-badge {
+  margin-top: 4px;
 }
 
 .account-settings-card {
