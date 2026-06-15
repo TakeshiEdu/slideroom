@@ -13,8 +13,10 @@ import {
   FileUp,
   FolderPlus,
   House,
+  Info,
   KeyRound,
   Leaf,
+  Link,
   ListOrdered,
   Lock,
   LogOut,
@@ -26,6 +28,7 @@ import {
   Send,
   Settings,
   ShieldCheck,
+  Sparkles,
   Trash2,
   Upload,
   User,
@@ -37,6 +40,7 @@ import { saveAs } from "file-saver";
 import { Toaster, toast } from "sonner";
 import accountPageDecor from "./assets/account-page-decor.png";
 import authIllustration from "./assets/auth-collaboration-illustration.png";
+import createRoomDecor from "./assets/create-room-decor.png";
 import decorBotanical from "./assets/decor-botanical-sparkles.png";
 import decorWorkflow from "./assets/decor-slide-workflow.png";
 import myroomsHeroIllustration from "./assets/myrooms-hero-illustration.png";
@@ -1056,28 +1060,41 @@ function CreateRoomPage() {
   }
 
   return (
-    <SimplePage>
+    <SimplePage className="create-room-page">
+      <img className="create-room-decor" src={createRoomDecor} alt="" aria-hidden="true" />
       <BackButton />
       <CenteredBrand />
-      <form className="form-card" onSubmit={submit}>
+      <form className="form-card create-room-card" onSubmit={submit}>
         <h1>ルームを作る</h1>
-        <DataExpiryNotice />
-        <label className="field">
+        <p className="data-expiry-note create-expiry-note">
+          <Info size={22} />
+          ルーム内のスライド、アップロードファイル、出力履歴は作成から24時間以内に自動削除されます。
+        </p>
+        <label className="field create-title-field">
           <span>タイトル</span>
-          <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="タイトルを入力" autoFocus />
+          <span className="input-with-soft-icon">
+            <Leaf size={24} />
+            <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="タイトルを入力" autoFocus />
+          </span>
         </label>
         <div className="field">
           <span>公開設定</span>
           <div className="choice-list">
             <button className={cx("choice", accessMode === "invite" && "is-active")} type="button" onClick={() => setAccessMode("invite")}>
-              <span className="radio-dot" /> URLまたは6ケタパスワードで参加
+              <span className="radio-dot" />
+              <span className="choice-soft-icon"><Link size={25} /></span>
+              URLまたは6ケタパスコードで参加
             </button>
             <button className={cx("choice", accessMode === "authenticated" && "is-active")} type="button" onClick={() => setAccessMode("authenticated")}>
-              <span className="radio-dot" /> ログインしているユーザーだけ参加可能
+              <span className="radio-dot" />
+              <span className="choice-soft-icon"><User size={25} /></span>
+              ログインしているユーザーだけ参加可能
             </button>
           </div>
         </div>
-        <button className="wide-primary" type="submit">ルームを作成</button>
+        <button className="wide-primary create-submit-button" type="submit">
+          <Sparkles size={24} /> ルームを作成
+        </button>
       </form>
     </SimplePage>
   );
@@ -1876,8 +1893,8 @@ function BackButton({ room, inline }: { room?: Room; inline?: boolean }) {
   );
 }
 
-function SimplePage({ children, wide }: { children: ReactNode; wide?: boolean }) {
-  return <main className={cx("simple-page", wide && "wide")}>{children}</main>;
+function SimplePage({ children, wide, className }: { children: ReactNode; wide?: boolean; className?: string }) {
+  return <main className={cx("simple-page", wide && "wide", className)}>{children}</main>;
 }
 
 function EmptyInline({ text }: { text: string }) {
