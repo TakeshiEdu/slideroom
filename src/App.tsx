@@ -35,6 +35,7 @@ import { Toaster, toast } from "sonner";
 import authIllustration from "./assets/auth-collaboration-illustration.png";
 import decorBotanical from "./assets/decor-botanical-sparkles.png";
 import decorWorkflow from "./assets/decor-slide-workflow.png";
+import myroomsHeroIllustration from "./assets/myrooms-hero-illustration.png";
 import previewHero from "./assets/slide-preview-hero.png";
 import { consumeAuthRedirectNotice, type AuthRedirectNotice } from "./services/authService";
 import { mergeService } from "./services/mergeService";
@@ -646,39 +647,50 @@ function MyRoomsPage() {
       <section className="dashboard-shell">
         <AppTopNav active="rooms" onLogout={handleLogout} />
         <div className="myrooms-hero">
-          <div>
+          <div className="myrooms-hero-copy">
             <h1>マイルーム</h1>
             <h2>こんにちは、{currentUser.name}さん</h2>
             <p>保存したルームを管理できます。</p>
           </div>
-          <div className="hero-action-row">
-            <button className="primary-action" onClick={() => navigate("/create")}>
-              <PlusCircle size={24} /> 新しいルームを作る
-            </button>
-            <button className="secondary-action" onClick={() => navigate("/join")}>
-              <KeyRound size={24} /> ルームに参加する
-            </button>
+          <div className="myrooms-hero-visual" aria-hidden="true">
+            <img src={myroomsHeroIllustration} alt="" />
           </div>
         </div>
-        <section className="saved-rooms">
-          <div className="section-title-row">
-            <h2>最近使ったルーム</h2>
-            {myRooms.length > 3 && (
-              <button className="see-all-button" type="button">
-                すべて見る <ArrowRight size={18} />
-              </button>
-            )}
-          </div>
-          <div className="room-card-list">
-            {recentRooms.length > 0 ? (
-              recentRooms.map((room, index) => (
-                <MyRoomCard key={room.id} room={room} iconIndex={index} thumbnailSvg={coverPreviews[room.id]} />
-              ))
-            ) : (
-              <EmptyRoomPanel compact />
-            )}
-          </div>
-        </section>
+        <div className="hero-action-row">
+          <button className="primary-action" onClick={() => navigate("/create")}>
+            <PlusCircle size={24} /> 新しいルームを作る <ArrowRight size={25} />
+          </button>
+          <button className="secondary-action" onClick={() => navigate("/join")}>
+            <KeyRound size={24} /> ルームに参加する <ArrowRight size={25} />
+          </button>
+        </div>
+        <div className="myrooms-lower-grid">
+          <section className="saved-rooms">
+            <div className="section-title-row">
+              <h2>最近使ったルーム</h2>
+              {myRooms.length > 3 && (
+                <button className="see-all-button" type="button">
+                  すべて見る <ArrowRight size={18} />
+                </button>
+              )}
+            </div>
+            <div className="room-card-list">
+              {recentRooms.length > 0 ? (
+                recentRooms.map((room, index) => (
+                  <MyRoomCard key={room.id} room={room} iconIndex={index} thumbnailSvg={coverPreviews[room.id]} />
+                ))
+              ) : (
+                <EmptyRoomPanel compact />
+              )}
+            </div>
+          </section>
+          <aside className="myrooms-guide-card" aria-label="保存したルームの管理について">
+            <ShieldCheck size={30} />
+            <strong>保存したルームをすばやく管理</strong>
+            <span />
+            <p>ルームの作成や参加が簡単に行えます。必要なときにすぐアクセスできます。</p>
+          </aside>
+        </div>
         <MobileBottomNav active="rooms" />
       </section>
     </main>
