@@ -2892,7 +2892,7 @@ button:disabled {
 
   .auth-shell-illustrated .auth-form-card {
     width: min(100%, calc(100vw - 48px));
-    margin: -10px auto 40px;
+    margin: 14px auto 40px;
     border: 1px solid rgba(216, 229, 245, 0.92);
     border-radius: 24px;
     padding: 34px 24px 28px;
