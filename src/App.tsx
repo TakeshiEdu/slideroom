@@ -32,6 +32,7 @@ import {
 import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { saveAs } from "file-saver";
 import { Toaster, toast } from "sonner";
+import authIllustration from "./assets/auth-collaboration-illustration.png";
 import decorBotanical from "./assets/decor-botanical-sparkles.png";
 import decorWorkflow from "./assets/decor-slide-workflow.png";
 import previewHero from "./assets/slide-preview-hero.png";
@@ -207,8 +208,8 @@ function RegisterPage() {
   }
 
   return (
-    <AuthPage>
-      <form className="auth-form" onSubmit={submit}>
+    <AuthPage illustrated>
+      <form className="auth-form auth-form-card" onSubmit={submit}>
         <h1>新規登録</h1>
         <p>アカウントを作成すると、ルームの保存やオンライン共有ができます。</p>
         <DataExpiryNotice />
@@ -372,7 +373,7 @@ function LoginPage() {
   }
 
   return (
-    <AuthPage compact>
+    <AuthPage compact illustrated>
       <form className="auth-form auth-form-card" onSubmit={submit}>
         <h1>ログイン</h1>
         <label className="auth-field icon-field">
@@ -574,13 +575,20 @@ function PrivacyPolicyModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-function AuthPage({ children, compact }: { children: ReactNode; compact?: boolean }) {
+function AuthPage({ children, compact, illustrated }: { children: ReactNode; compact?: boolean; illustrated?: boolean }) {
   return (
     <main className={cx("auth-page", compact && "is-compact")}>
-      <section className="auth-shell">
+      <section className={cx("auth-shell", illustrated && "auth-shell-illustrated")}>
         <BackButton />
         <CenteredBrand />
-        {children}
+        {illustrated ? (
+          <div className="auth-illustrated-card">
+            <div className="auth-form-side">{children}</div>
+            <aside className="auth-visual-panel" aria-hidden="true">
+              <img src={authIllustration} alt="" />
+            </aside>
+          </div>
+        ) : children}
       </section>
     </main>
   );
