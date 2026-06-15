@@ -303,6 +303,7 @@ button:disabled {
 
 .auth-form {
   display: grid;
+  align-content: start;
   gap: 22px;
   width: min(620px, calc(100% - 36px));
   margin: 54px auto 64px;
@@ -2891,6 +2892,7 @@ button:disabled {
   }
 
   .auth-shell-illustrated .auth-form-card {
+    min-height: auto;
     width: min(100%, calc(100vw - 48px));
     margin: 14px auto 40px;
     border: 1px solid rgba(216, 229, 245, 0.92);
