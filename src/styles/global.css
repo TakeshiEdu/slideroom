@@ -1157,6 +1157,10 @@ button:disabled {
   color: var(--blue);
 }
 
+.home-title-keep {
+  white-space: nowrap;
+}
+
 .home-hero p {
   max-width: 560px;
   margin: 0;

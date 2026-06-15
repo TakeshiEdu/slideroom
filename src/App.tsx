@@ -147,7 +147,7 @@ function HomePage({ room: _room }: { room?: Room }) {
         <SimpleHeader action={<button className="home-login-button" type="button" onClick={() => navigate("/login")}><LogIn size={20} /> ログイン</button>} />
         <div className="home-hero">
           <span className="pill">PowerPoint合体を、いちばんシンプルに。</span>
-          <h1>みんなの <b>PowerPoint</b> を、<br />ひとつに。</h1>
+          <h1>みんなの <span className="home-title-keep"><b>PowerPoint</b> を、</span><br />ひとつに。</h1>
           <p>複数のPowerPointファイルをアップロードして、順番を並べるだけで、ひとつのファイルにまとめます。</p>
           <div className="hero-actions">
             <button className="primary-action" onClick={() => navigate("/register")}>
