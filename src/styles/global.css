@@ -62,12 +62,36 @@ button:disabled {
 }
 
 .home-card {
+  position: relative;
+  isolation: isolate;
   min-height: calc(100vh - 36px);
   border: 1px solid rgba(15, 38, 75, 0.22);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.94);
+  background:
+    radial-gradient(circle at 94% 16%, rgba(11, 107, 255, 0.08), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(247, 251, 255, 0.96));
   box-shadow: var(--small-shadow);
   overflow: hidden;
+}
+
+.home-card > :not(.home-decor) {
+  position: relative;
+  z-index: 1;
+}
+
+.home-decor {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  user-select: none;
+}
+
+.home-decor-botanical {
+  top: 88px;
+  right: -330px;
+  width: min(860px, 78vw);
+  opacity: 0.32;
+  transform: rotate(-1deg);
 }
 
 .simple-header {
@@ -1273,15 +1297,19 @@ button:disabled {
 
 .demo-screenshots {
   display: grid;
+  position: relative;
   width: min(960px, calc(100% - 52px));
   margin: 18px auto 20px;
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 18px 22px 22px;
-  background: #ffffff;
+  background:
+    radial-gradient(circle at 90% 12%, rgba(11, 107, 255, 0.08), transparent 26%),
+    linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
   box-shadow: var(--small-shadow);
   color: inherit;
   text-align: left;
+  overflow: hidden;
 }
 
 .demo-head,
@@ -1310,6 +1338,14 @@ button:disabled {
   margin: 14px 0 16px;
 }
 
+.demo-generated-asset {
+  width: clamp(88px, 16vw, 150px);
+  max-width: 28%;
+  object-fit: contain;
+  opacity: 0.92;
+  filter: drop-shadow(0 14px 26px rgba(31, 54, 86, 0.14));
+}
+
 .demo-title-row strong {
   font-size: 1.14rem;
 }
@@ -1321,6 +1357,7 @@ button:disabled {
 }
 
 .demo-menu {
+  display: none;
   color: var(--ink);
   font-weight: 900;
 }
@@ -2312,6 +2349,13 @@ button:disabled {
     height: 18px;
   }
 
+  .home-decor-botanical {
+    top: 74px;
+    right: -340px;
+    width: 720px;
+    opacity: 0.14;
+  }
+
   .home-hero {
     padding: 26px 22px 18px;
   }
@@ -2407,6 +2451,12 @@ button:disabled {
 
   .demo-title-row {
     align-items: flex-start;
+  }
+
+  .demo-generated-asset {
+    width: 92px;
+    max-width: 30%;
+    opacity: 0.78;
   }
 
   .demo-screen-body {
@@ -2623,6 +2673,10 @@ button:disabled {
   .section-rule {
     gap: 10px;
     font-size: 1rem;
+  }
+
+  .demo-generated-asset {
+    display: none;
   }
 
   .primary-action,

@@ -32,6 +32,8 @@ import {
 import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { saveAs } from "file-saver";
 import { Toaster, toast } from "sonner";
+import decorBotanical from "./assets/decor-botanical-sparkles.png";
+import decorWorkflow from "./assets/decor-slide-workflow.png";
 import previewHero from "./assets/slide-preview-hero.png";
 import { consumeAuthRedirectNotice, type AuthRedirectNotice } from "./services/authService";
 import { mergeService } from "./services/mergeService";
@@ -140,6 +142,7 @@ function HomePage({ room: _room }: { room?: Room }) {
   return (
     <main className="home-shell">
       <section className="home-card">
+        <img className="home-decor home-decor-botanical" src={decorBotanical} alt="" aria-hidden="true" />
         <SimpleHeader action={<button className="home-login-button" type="button" onClick={() => navigate("/login")}><LogIn size={20} /> ログイン</button>} />
         <div className="home-hero">
           <span className="pill">PowerPoint合体を、いちばんシンプルに。</span>
@@ -1660,6 +1663,7 @@ function DemoScreenshots() {
           <strong>ルーム作成から書き出しまでの流れ</strong>
           <p>新しい操作画面に合わせた使い方デモです。</p>
         </div>
+        <img className="demo-generated-asset" src={decorWorkflow} alt="" aria-hidden="true" />
         <span className="demo-menu">...</span>
       </div>
       <div className="demo-screen-grid">
