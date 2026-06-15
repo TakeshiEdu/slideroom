@@ -14,13 +14,16 @@ import {
   FolderPlus,
   House,
   KeyRound,
+  Leaf,
   ListOrdered,
   Lock,
   LogOut,
   LogIn,
   Mail,
+  Pencil,
   PlusCircle,
   Save,
+  Send,
   Settings,
   ShieldCheck,
   Trash2,
@@ -32,6 +35,7 @@ import {
 import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { saveAs } from "file-saver";
 import { Toaster, toast } from "sonner";
+import accountPageDecor from "./assets/account-page-decor.png";
 import authIllustration from "./assets/auth-collaboration-illustration.png";
 import decorBotanical from "./assets/decor-botanical-sparkles.png";
 import decorWorkflow from "./assets/decor-slide-workflow.png";
@@ -852,6 +856,7 @@ function AccountPage() {
     <main className="myrooms-page">
       <section className="dashboard-shell">
         <AppTopNav active="account" onLogout={handleLogout} />
+        <img className="account-page-decor" src={accountPageDecor} alt="" aria-hidden="true" />
         <section className="account-panel account-panel-v2">
           <h1 className="account-mobile-title">マイページ</h1>
           <div className="account-layout">
@@ -877,20 +882,20 @@ function AccountPage() {
               )}
 
               <div className="account-section">
-                <h2>アカウント</h2>
+                <h2><span className="account-section-icon"><User size={24} /></span>アカウント</h2>
                 <div className="account-setting-row">
                   <span>表示名</span>
                   <strong>{currentUser.name}</strong>
-                  <button className="outline-mini" type="button" onClick={() => setEditingPanel("name")}>編集</button>
+                  <button className="outline-mini" type="button" onClick={() => setEditingPanel("name")}><Pencil size={18} />編集</button>
                 </div>
               </div>
 
               <div className="account-section">
-                <h2>メールアドレス</h2>
+                <h2><span className="account-section-icon"><Mail size={24} /></span>メールアドレス</h2>
                 <div className="account-setting-row">
                   <span>メールアドレス</span>
                   <strong>{currentUser.email ?? "未設定"}</strong>
-                  <button className="outline-mini" type="button" onClick={() => setEditingPanel("email")}>変更する</button>
+                  <button className="outline-mini" type="button" onClick={() => setEditingPanel("email")}><Mail size={18} />変更する</button>
                 </div>
                 <p className="account-inline-help">現在のメールアドレスと新しいメールアドレスの両方に確認リンクを送信します。両方のリンクを開くまで、メールアドレスは変更されません。</p>
                 {!isEmailVerified && (
@@ -910,23 +915,25 @@ function AccountPage() {
               </div>
 
               <div className="account-section">
-                <h2>パスワード</h2>
+                <h2><span className="account-section-icon"><Lock size={24} /></span>パスワード</h2>
                 <div className="account-setting-row">
                   <span>登録メールに再設定リンクを送信します。</span>
                   <strong />
                   <button className="outline-mini" type="button" onClick={sendPasswordReset} disabled={sendingPasswordReset || !currentUser.email}>
-                    {sendingPasswordReset ? "送信中..." : "再設定メールを送信"}
+                    {sendingPasswordReset ? "送信中..." : <><Send size={18} />再設定メールを送信</>}
                   </button>
                 </div>
               </div>
 
               <div className="account-section account-section-other">
-                <h2>その他</h2>
+                <h2><span className="account-section-icon"><Leaf size={24} /></span>その他</h2>
                 <button className="account-link-row" type="button" onClick={() => setPrivacyOpen(true)}>
+                  <ShieldCheck size={22} />
                   <span>プライバシーポリシー</span>
                   <ArrowRight size={22} />
                 </button>
                 <button className="account-link-row" type="button" onClick={handleLogout}>
+                  <LogOut size={22} />
                   <span>ログアウト</span>
                   <ArrowRight size={22} />
                 </button>
