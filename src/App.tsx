@@ -862,8 +862,11 @@ function AccountPage() {
       <section className="dashboard-shell">
         <AppTopNav active="account" onLogout={handleLogout} />
         <img className="account-page-decor" src={accountPageDecor} alt="" aria-hidden="true" />
+        <button className="account-mobile-back" type="button" onClick={() => navigate("/")} aria-label="戻る">
+          <ArrowLeft size={34} />
+        </button>
         <section className="account-panel account-panel-v2">
-          <h1 className="account-mobile-title">マイページ</h1>
+          <h1 className="account-mobile-title">アカウント設定</h1>
           <div className="account-layout">
             <aside className="account-profile-card">
               <span className="user-avatar account-avatar">{currentUser.name.trim().charAt(0) || "U"}</span>
@@ -886,23 +889,23 @@ function AccountPage() {
                 </div>
               )}
 
-              <div className="account-section">
-                <h2><span className="account-section-icon"><User size={24} /></span>アカウント</h2>
+              <div className="account-section account-name-section">
+                <h2><span className="account-section-icon"><User size={24} /></span>名前変更</h2>
                 <div className="account-setting-row">
-                  <span>表示名</span>
+                  <span>表示名を変更</span>
                   <strong>{currentUser.name}</strong>
                   <button className="outline-mini" type="button" onClick={() => setEditingPanel("name")}><Pencil size={18} />編集</button>
                 </div>
               </div>
 
-              <div className="account-section">
-                <h2><span className="account-section-icon"><Mail size={24} /></span>メールアドレス</h2>
+              <div className="account-section account-email-section">
+                <h2><span className="account-section-icon"><Mail size={24} /></span>メール設定</h2>
                 <div className="account-setting-row">
                   <span>メールアドレス</span>
                   <strong>{currentUser.email ?? "未設定"}</strong>
                   <button className="outline-mini" type="button" onClick={() => setEditingPanel("email")}><Mail size={18} />変更する</button>
                 </div>
-                <p className="account-inline-help">現在のメールアドレスと新しいメールアドレスの両方に確認リンクを送信します。両方のリンクを開くまで、メールアドレスは変更されません。</p>
+                <p className="account-inline-help">メールアドレスを変更</p>
                 {!isEmailVerified && (
                   <button className="account-text-action" type="button" onClick={sendVerificationCode} disabled={sendingCode}>
                     {sendingCode ? "送信中..." : verificationSent ? "パスコードを再送信" : "メール認証パスコードを送信"}
@@ -922,7 +925,7 @@ function AccountPage() {
               <div className="account-section">
                 <h2><span className="account-section-icon"><Lock size={24} /></span>パスワード</h2>
                 <div className="account-setting-row">
-                  <span>登録メールに再設定リンクを送信します。</span>
+                  <span>再設定メールを送信</span>
                   <strong />
                   <button className="outline-mini" type="button" onClick={sendPasswordReset} disabled={sendingPasswordReset || !currentUser.email}>
                     {sendingPasswordReset ? "送信中..." : <><Send size={18} />再設定メールを送信</>}
