@@ -4938,14 +4938,14 @@ button:disabled {
   .create-room-page .centered-brand {
     width: 100%;
     min-height: 86px;
-    margin: 0 auto 82px;
+    margin: 0 auto 62px;
     border-bottom: 0;
     background: transparent;
     backdrop-filter: none;
   }
 
   .create-room-page .back-button {
-    top: 102px;
+    top: 150px;
     left: 22px;
     width: 54px;
     height: 54px;
