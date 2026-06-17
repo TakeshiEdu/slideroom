@@ -5503,16 +5503,22 @@ button:disabled {
   }
 
   .room-workspace-v2 .copy-field div {
+    display: grid;
     grid-template-columns: 1fr;
     gap: 10px;
+    position: static;
   }
 
   .room-workspace-v2 .copy-field input {
     min-height: 56px;
+    padding: 0 14px;
   }
 
   .room-workspace-v2 .copy-field button {
+    position: static;
+    justify-content: center;
     width: 100%;
+    box-sizing: border-box;
     min-height: 56px;
   }
 
