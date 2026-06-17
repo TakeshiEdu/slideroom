@@ -45,6 +45,7 @@ import decorBotanical from "./assets/decor-botanical-sparkles.png";
 import decorWorkflow from "./assets/decor-slide-workflow.png";
 import myroomsHeroIllustration from "./assets/myrooms-hero-illustration.png";
 import previewHero from "./assets/slide-preview-hero.png";
+import roomWorkspaceDecor from "./assets/room-workspace-decor.png";
 import { consumeAuthRedirectNotice, type AuthRedirectNotice } from "./services/authService";
 import { mergeService } from "./services/mergeService";
 import { createPptxSlidePreviewSvgs } from "./services/pptxPreviewService";
@@ -1162,11 +1163,14 @@ function RoomPage({ room }: { room: Room }) {
   const roomMembers = members.filter((member) => member.roomId === room.id);
 
   return (
-    <SimplePage wide>
+    <SimplePage wide className="room-page-v2">
+      <img className="room-page-decor" src={roomWorkspaceDecor} alt="" aria-hidden="true" />
       <CenteredBrand />
-      <section className="room-workspace">
+      <section className="room-workspace room-workspace-v2">
         <BackButton inline />
-        <h1>{room.title}</h1>
+        <div className="room-hero-title">
+          <h1>{room.title}</h1>
+        </div>
         <div className="share-grid">
           <CopyField label="参加URL" value={shareUrl} />
           <CopyField label="6ケタパスコード" value={room.inviteCode} />
@@ -1178,17 +1182,19 @@ function RoomPage({ room }: { room: Room }) {
         </p>
         <DataExpiryNotice />
         <UploadBox roomId={room.id} />
-        <MemberSection members={roomMembers} />
-        <section className="file-section">
-          <h2>現在のスライドファイル</h2>
-          <div className="file-list-simple">
-            {roomFiles.length === 0 ? (
-              <EmptyInline text="まだファイルがありません。" />
-            ) : (
-              roomFiles.map((file) => <FileRow key={file.id} file={file} />)
-            )}
-          </div>
-        </section>
+        <div className="room-content-grid">
+          <MemberSection members={roomMembers} />
+          <section className="file-section">
+            <h2>現在のスライドファイル</h2>
+            <div className="file-list-simple">
+              {roomFiles.length === 0 ? (
+                <EmptyInline text="まだファイルがありません。" />
+              ) : (
+                roomFiles.map((file) => <FileRow key={file.id} file={file} />)
+              )}
+            </div>
+          </section>
+        </div>
         <div className="room-actions">
           <button className="secondary-action" onClick={() => navigate(`/room/${room.id}/order`)}>
             <ListOrdered size={24} /> スライド順番を表示
