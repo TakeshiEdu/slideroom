@@ -40,6 +40,7 @@ import { saveAs } from "file-saver";
 import { Toaster, toast } from "sonner";
 import accountPageDecor from "./assets/account-page-decor.png";
 import authIllustration from "./assets/auth-collaboration-illustration.png";
+import brandLogo from "./assets/brand-logo.png";
 import createRoomDecor from "./assets/create-room-decor.png";
 import decorBotanical from "./assets/decor-botanical-sparkles.png";
 import decorWorkflow from "./assets/decor-slide-workflow.png";
@@ -1881,8 +1882,7 @@ function SimpleHeader({ action }: { action?: ReactNode }) {
 function BrandMini() {
   return (
     <span className="brand-mini">
-      <span className="brand-icon" />
-      SlideRoom
+      <img className="brand-logo" src={brandLogo} alt="SlideRoom" />
     </span>
   );
 }

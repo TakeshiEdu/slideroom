@@ -115,6 +115,13 @@ button:disabled {
   font-weight: 900;
 }
 
+.brand-logo {
+  display: block;
+  width: auto;
+  height: 42px;
+  object-fit: contain;
+}
+
 .brand-icon {
   position: relative;
   display: inline-block;
@@ -1365,6 +1372,11 @@ button:disabled {
 
 .mini-room-head .brand-mini {
   font-size: 0.95rem;
+}
+
+.mini-room-head .brand-logo,
+.demo-head .brand-logo {
+  height: 30px;
 }
 
 .mini-room-head .brand-icon {
