@@ -1122,10 +1122,11 @@ function JoinRoomPage({ inviteCode }: { inviteCode?: string }) {
   }
 
   return (
-    <SimplePage>
+    <SimplePage className="join-room-page">
+      <img className="join-room-decor" src={createRoomDecor} alt="" aria-hidden="true" />
       <BackButton />
       <CenteredBrand />
-      <form className="form-card compact" onSubmit={submit}>
+      <form className="form-card compact join-room-card" onSubmit={submit}>
         <h1>ルームに参加</h1>
         {isAuthenticated ? (
           <div className="join-user-card">
@@ -1136,13 +1137,13 @@ function JoinRoomPage({ inviteCode }: { inviteCode?: string }) {
             </div>
           </div>
         ) : (
-          <label className="input-with-icon">
+          <label className="input-with-soft-icon">
             <User size={22} />
             <input value={name} onChange={(event) => setName(event.target.value)} placeholder="ユーザーネーム" />
           </label>
         )}
-        <label className="input-with-icon">
-          <Lock size={22} />
+        <label className="input-with-soft-icon">
+          <KeyRound size={22} />
           <input value={code} onChange={(event) => setCode(event.target.value.toUpperCase())} placeholder="6ケタパスワード" />
         </label>
         <button className="wide-primary" type="submit">参加する</button>
