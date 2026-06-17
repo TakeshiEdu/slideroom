@@ -5493,23 +5493,37 @@ button:disabled {
 
   .room-workspace-v2 .copy-field {
     grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "icon label"
+      "control control";
     gap: 12px 14px;
     padding: 20px 18px;
   }
 
   .room-workspace-v2 .copy-field::before {
+    grid-area: icon;
     width: 48px;
     height: 48px;
   }
 
+  .room-workspace-v2 .copy-field > span {
+    grid-area: label;
+    align-self: center;
+  }
+
   .room-workspace-v2 .copy-field div {
+    grid-area: control;
     display: grid;
     grid-template-columns: 1fr;
     gap: 10px;
     position: static;
+    width: calc(100% - 40px);
+    justify-self: center;
   }
 
   .room-workspace-v2 .copy-field input {
+    width: 100%;
+    box-sizing: border-box;
     min-height: 56px;
     padding: 0 14px;
   }
@@ -5520,6 +5534,9 @@ button:disabled {
     width: 100%;
     box-sizing: border-box;
     min-height: 56px;
+    border: 0;
+    border-radius: 10px;
+    box-shadow: inset 0 0 0 2px var(--blue);
   }
 
   .room-workspace-v2 .access-mode-note {
