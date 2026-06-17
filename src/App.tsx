@@ -1064,7 +1064,7 @@ function CreateRoomPage() {
       <img className="create-room-decor" src={createRoomDecor} alt="" aria-hidden="true" />
       <BackButton />
       <CenteredBrand />
-      <form className="form-card create-room-card" onSubmit={submit}>
+      <form className="form-card create-room-card" data-ui-version="create-room-20260617" onSubmit={submit}>
         <h1>ルームを作る</h1>
         <p className="data-expiry-note create-expiry-note">
           <Info size={22} />
