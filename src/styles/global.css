@@ -1863,7 +1863,7 @@ button:disabled {
 }
 
 .create-room-page .back-button {
-  top: 108px;
+  top: 150px;
   left: 56px;
   display: grid;
   place-items: center;
@@ -4928,7 +4928,7 @@ button:disabled {
 
   .create-room-decor {
     inset: 0 0 auto;
-    height: 310px;
+    height: 230px;
     object-fit: cover;
     object-position: 74% top;
     opacity: 0.7;
@@ -4936,20 +4936,20 @@ button:disabled {
 
   .create-room-page .centered-brand {
     width: 100%;
-    min-height: 106px;
-    margin: 0 auto 254px;
+    min-height: 86px;
+    margin: 0 auto 150px;
     border-bottom: 0;
     background: transparent;
     backdrop-filter: none;
   }
 
   .create-room-page .back-button {
-    top: 32px;
-    left: 28px;
-    width: 66px;
-    height: 66px;
+    top: 98px;
+    left: 22px;
+    width: 54px;
+    height: 54px;
     border: 0;
-    border-radius: 20px;
+    border-radius: 16px;
     background: rgba(255, 255, 255, 0.86);
     box-shadow: 0 12px 26px rgba(31, 54, 86, 0.08);
   }
