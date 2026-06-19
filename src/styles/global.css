@@ -2197,6 +2197,302 @@ button:disabled {
   font-weight: 750;
 }
 
+.upload-box[aria-busy="true"] {
+  border-color: #31c48d;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(49, 196, 141, 0.12), transparent 28%),
+    linear-gradient(180deg, rgba(247, 255, 251, 0.94), rgba(255, 255, 255, 0.92));
+}
+
+.upload-processing {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  width: min(100%, 420px);
+  min-height: 170px;
+  align-content: center;
+  color: #08785d;
+}
+
+.upload-processing strong {
+  color: var(--navy);
+  font-size: 1.12rem;
+  font-weight: 950;
+}
+
+.upload-processing p {
+  max-width: 360px;
+  margin: 0;
+  color: #537067;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.pptx-loader {
+  position: relative;
+  width: 156px;
+  height: 104px;
+}
+
+.pptx-loader::before {
+  position: absolute;
+  inset: 30px 18px 0;
+  border-radius: 999px;
+  background: rgba(31, 181, 126, 0.14);
+  filter: blur(8px);
+  content: "";
+}
+
+.pptx-sheet {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  box-shadow: 0 14px 28px rgba(20, 121, 91, 0.16);
+}
+
+.pptx-sheet-back {
+  left: 12px;
+  top: 22px;
+  width: 80px;
+  height: 54px;
+  background: linear-gradient(135deg, #e8fff4, #c9f5de);
+  animation: pptxBackFloat 1.8s ease-in-out infinite;
+}
+
+.pptx-sheet-front {
+  left: 42px;
+  top: 10px;
+  width: 88px;
+  height: 62px;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, #ffffff, #ebfff6 68%),
+    linear-gradient(90deg, #23b886, #69dfa8);
+  animation: pptxFrontFly 1.8s ease-in-out infinite;
+}
+
+.pptx-sheet-front::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 22px;
+  height: 100%;
+  background: linear-gradient(180deg, #22c58e, #0ea271);
+  content: "";
+}
+
+.pptx-sheet-front span {
+  position: relative;
+  margin: 0 0 0 16px;
+  color: #08785d;
+  font-size: 0.78rem;
+  font-weight: 950;
+  letter-spacing: 0;
+}
+
+.upload-arrow {
+  position: absolute;
+  right: 2px;
+  bottom: 18px;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #31d49b, #0fa97a);
+  box-shadow: 0 14px 26px rgba(15, 169, 122, 0.26);
+  animation: uploadPulse 1.8s ease-in-out infinite;
+}
+
+.upload-arrow::before,
+.upload-arrow::after {
+  position: absolute;
+  left: 50%;
+  background: #ffffff;
+  content: "";
+  transform: translateX(-50%);
+}
+
+.upload-arrow::before {
+  top: 12px;
+  width: 4px;
+  height: 20px;
+  border-radius: 999px;
+}
+
+.upload-arrow::after {
+  top: 10px;
+  width: 14px;
+  height: 14px;
+  border-top: 4px solid #ffffff;
+  border-left: 4px solid #ffffff;
+  background: transparent;
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.upload-cloud {
+  position: absolute;
+  right: 10px;
+  top: 8px;
+  width: 48px;
+  height: 24px;
+  border-radius: 999px;
+  background: rgba(214, 250, 231, 0.92);
+  animation: cloudBreathe 1.8s ease-in-out infinite;
+}
+
+.upload-cloud::before,
+.upload-cloud::after {
+  position: absolute;
+  bottom: 8px;
+  border-radius: 999px;
+  background: inherit;
+  content: "";
+}
+
+.upload-cloud::before {
+  left: 9px;
+  width: 20px;
+  height: 20px;
+}
+
+.upload-cloud::after {
+  right: 8px;
+  width: 16px;
+  height: 16px;
+}
+
+.mail-send-animation {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  min-height: 70px;
+  border: 1px solid rgba(36, 184, 127, 0.28);
+  border-radius: 14px;
+  padding: 12px 16px;
+  background:
+    radial-gradient(circle at 12% 50%, rgba(54, 211, 149, 0.12), transparent 36%),
+    linear-gradient(180deg, rgba(247, 255, 251, 0.96), rgba(255, 255, 255, 0.94));
+  color: #08785d;
+  font-weight: 950;
+}
+
+.mail-send-animation.is-compact {
+  min-height: 56px;
+  margin-top: 4px;
+}
+
+.account-section .mail-send-animation {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
+.mail-motion {
+  position: relative;
+  width: 76px;
+  height: 44px;
+}
+
+.mail-envelope {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  width: 44px;
+  height: 30px;
+  border: 3px solid #16b981;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 12px 22px rgba(22, 185, 129, 0.16);
+  animation: mailFly 1.35s ease-in-out infinite;
+}
+
+.mail-envelope::before,
+.mail-envelope::after {
+  position: absolute;
+  top: 4px;
+  width: 23px;
+  height: 18px;
+  border-bottom: 3px solid #16b981;
+  content: "";
+}
+
+.mail-envelope::before {
+  left: 0;
+  transform: skewY(33deg);
+}
+
+.mail-envelope::after {
+  right: 0;
+  transform: skewY(-33deg);
+}
+
+.mail-trail {
+  position: absolute;
+  left: 2px;
+  height: 5px;
+  border-radius: 999px;
+  background: #7ae1b5;
+  animation: mailTrail 1.35s ease-in-out infinite;
+}
+
+.mail-trail-one {
+  top: 12px;
+  width: 18px;
+}
+
+.mail-trail-two {
+  top: 22px;
+  width: 28px;
+  animation-delay: 0.08s;
+}
+
+.mail-trail-three {
+  top: 32px;
+  width: 14px;
+  animation-delay: 0.16s;
+}
+
+@keyframes pptxFrontFly {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(-2deg); }
+  45% { transform: translate3d(12px, -8px, 0) rotate(3deg); }
+}
+
+@keyframes pptxBackFloat {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(3deg); opacity: 0.82; }
+  45% { transform: translate3d(-5px, 5px, 0) rotate(-2deg); opacity: 1; }
+}
+
+@keyframes uploadPulse {
+  0%, 100% { transform: translateY(0) scale(1); }
+  45% { transform: translateY(-7px) scale(1.05); }
+}
+
+@keyframes cloudBreathe {
+  0%, 100% { transform: scale(1); opacity: 0.72; }
+  45% { transform: scale(1.08); opacity: 1; }
+}
+
+@keyframes mailFly {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(-4deg); }
+  50% { transform: translate3d(12px, -5px, 0) rotate(5deg); }
+}
+
+@keyframes mailTrail {
+  0%, 100% { transform: scaleX(0.72); opacity: 0.38; }
+  50% { transform: scaleX(1); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pptx-sheet-back,
+  .pptx-sheet-front,
+  .upload-arrow,
+  .upload-cloud,
+  .mail-envelope,
+  .mail-trail {
+    animation: none;
+  }
+}
+
 .file-section h2 {
   margin: 0 0 14px;
   font-size: 1rem;

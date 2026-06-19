@@ -455,6 +455,7 @@ function ForgotPasswordPage() {
             </div>
           </div>
         )}
+        {submitting && <MailSendingAnimation label="再設定メールを送信しています" />}
         <button className="wide-primary" type="submit" disabled={submitting}>{submitting ? "送信中..." : "再設定メールを送信"}</button>
         <button className="auth-link" type="button" onClick={() => navigate("/login")}>ログインに戻る</button>
       </form>
@@ -932,6 +933,7 @@ function AccountPage() {
                     {sendingPasswordReset ? "送信中..." : <><Send size={18} />再設定メールを送信</>}
                   </button>
                 </div>
+                {sendingPasswordReset && <MailSendingAnimation label="再設定メールを送信しています" compact />}
               </div>
 
               <div className="account-section account-section-other">
@@ -983,6 +985,7 @@ function AccountPage() {
                 <span>新しいメールアドレス</span>
                 <input value={newEmail} onChange={(event) => setNewEmail(event.target.value)} type="email" placeholder="new@example.com" />
               </label>
+              {sendingEmailChange && <MailSendingAnimation label="確認メールを送信しています" />}
               <button className="wide-primary" type="submit" disabled={sendingEmailChange}>{sendingEmailChange ? "送信中..." : "確認メールを送信"}</button>
             </form>
           </div>
@@ -1522,9 +1525,13 @@ function normalizeExportError(error: unknown) {
 function UploadBox({ roomId }: { roomId: string }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const { addFile, isUploading } = useAppStore();
+  const [localUploading, setLocalUploading] = useState(false);
+  const uploading = isUploading || localUploading;
 
   async function handleFiles(fileList: FileList | null) {
     if (!fileList || fileList.length === 0) return;
+    setLocalUploading(true);
+    const animationStartedAt = Date.now();
     try {
       for (const file of Array.from(fileList)) {
         await addFile(roomId, file);
@@ -1533,6 +1540,11 @@ function UploadBox({ roomId }: { roomId: string }) {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "アップロードに失敗しました。");
     } finally {
+      const remainingAnimationMs = 850 - (Date.now() - animationStartedAt);
+      if (remainingAnimationMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, remainingAnimationMs));
+      }
+      setLocalUploading(false);
       if (inputRef.current) inputRef.current.value = "";
     }
   }
@@ -1543,17 +1555,62 @@ function UploadBox({ roomId }: { roomId: string }) {
       onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => {
         event.preventDefault();
-        handleFiles(event.dataTransfer.files);
+        if (!uploading) handleFiles(event.dataTransfer.files);
       }}
+      aria-busy={uploading}
     >
-      <input ref={inputRef} type="file" multiple hidden onChange={(event) => handleFiles(event.target.files)} />
-      <FileUp size={46} />
-      <p>ファイルをドラッグ&ドロップしてください</p>
-      <span>または</span>
-      <button className="primary-action small" onClick={() => inputRef.current?.click()} disabled={isUploading}>
-        ファイルを選択
-      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        multiple
+        hidden
+        onChange={(event) => handleFiles(event.target.files)}
+      />
+      {uploading ? (
+        <UploadProcessingAnimation />
+      ) : (
+        <>
+          <FileUp size={46} />
+          <p>PPTXファイルをドラッグ&ドロップしてください</p>
+          <span>PPTXのみアップロードできます</span>
+          <button className="primary-action small" onClick={() => inputRef.current?.click()} disabled={uploading}>
+            ファイルを選択
+          </button>
+        </>
+      )}
     </section>
+  );
+}
+
+function UploadProcessingAnimation() {
+  return (
+    <div className="upload-processing" role="status" aria-live="polite">
+      <div className="pptx-loader" aria-hidden="true">
+        <span className="pptx-sheet pptx-sheet-back" />
+        <span className="pptx-sheet pptx-sheet-front">
+          <span>PPTX</span>
+        </span>
+        <span className="upload-arrow" />
+        <span className="upload-cloud" />
+      </div>
+      <strong>PPTXをアップロードしています</strong>
+      <p>スライドを取り込み中です。画面はこのままでお待ちください。</p>
+    </div>
+  );
+}
+
+function MailSendingAnimation({ label, compact }: { label: string; compact?: boolean }) {
+  return (
+    <div className={cx("mail-send-animation", compact && "is-compact")} role="status" aria-live="polite">
+      <span className="mail-motion" aria-hidden="true">
+        <span className="mail-envelope" />
+        <span className="mail-trail mail-trail-one" />
+        <span className="mail-trail mail-trail-two" />
+        <span className="mail-trail mail-trail-three" />
+      </span>
+      <span>{label}</span>
+    </div>
   );
 }
 

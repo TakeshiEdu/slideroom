@@ -1,6 +1,6 @@
 import type { ValidationResult } from "../types";
 
-export const ALLOWED_EXTENSIONS = ["pptx", "ppt", "pdf", "docx", "xlsx"];
+export const ALLOWED_EXTENSIONS = ["pptx"];
 export const MAX_UPLOAD_BYTES = 200 * 1024 * 1024;
 
 export function getExtension(fileName: string) {
@@ -15,7 +15,7 @@ export function validateUploadFile(file: File): ValidationResult {
 
   const extension = getExtension(file.name);
   if (!ALLOWED_EXTENSIONS.includes(extension)) {
-    return { valid: false, message: "対応形式は pptx / ppt / pdf / docx / xlsx です。" };
+    return { valid: false, message: "アップロードできるファイルはPPTXのみです。" };
   }
 
   if (file.size > MAX_UPLOAD_BYTES) {
