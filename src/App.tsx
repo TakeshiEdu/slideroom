@@ -1120,7 +1120,7 @@ function JoinRoomPage({ inviteCode }: { inviteCode?: string }) {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    await syncFromServer();
+    await syncFromServer({ inviteCode: code });
     const result = joinRoom(code, joinedName);
     if (result.error || !result.room) {
       toast.error(result.error ?? "参加できませんでした。");

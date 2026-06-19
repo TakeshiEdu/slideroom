@@ -13,3 +13,439 @@ set
   name = excluded.name,
   public = excluded.public,
   file_size_limit = excluded.file_size_limit;
+
+-- Production schema foundation.
+-- The legacy app_state table remains for the current app while the application
+-- is migrated to table-backed reads/writes in Phase 1.
+
+create table if not exists public.profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  display_name text not null check (char_length(display_name) between 1 and 80),
+  avatar_url text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.rooms (
+  id text primary key,
+  title text not null check (char_length(title) between 1 and 140),
+  class_name text not null default '',
+  team_name text,
+  description text,
+  status text not null default 'draft' check (status in ('draft', 'in_progress', 'waiting', 'ready', 'completed', 'archived')),
+  access_mode text not null default 'invite' check (access_mode in ('invite', 'authenticated')),
+  host_user_id uuid not null references auth.users(id) on delete cascade,
+  invite_code text not null unique check (invite_code ~ '^[A-Z0-9]{4,16}$'),
+  invite_url text not null default '',
+  presentation_at timestamptz,
+  deadline_at timestamptz,
+  archived_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.room_members (
+  id text primary key,
+  room_id text not null references public.rooms(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  display_name text not null check (char_length(display_name) between 1 and 120),
+  role text not null default 'member' check (role in ('host', 'admin', 'member', 'viewer')),
+  assigned_range text,
+  joined_at timestamptz not null default now(),
+  unique (room_id, user_id)
+);
+
+create table if not exists public.files (
+  id text primary key,
+  room_id text not null references public.rooms(id) on delete cascade,
+  owner_user_id uuid not null references auth.users(id) on delete cascade,
+  owner_name text not null check (char_length(owner_name) between 1 and 120),
+  name text not null check (char_length(name) between 1 and 240),
+  original_name text not null check (char_length(original_name) between 1 and 240),
+  mime_type text not null default 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  extension text not null default 'pptx' check (extension = 'pptx'),
+  size_bytes bigint not null check (size_bytes between 0 and 314572800),
+  status text not null default 'submitted' check (status in ('submitted', 'not_submitted', 'revision_requested', 'reviewing', 'approved', 'excluded')),
+  version integer not null default 1 check (version > 0),
+  assigned_range text,
+  slide_count integer not null default 1 check (slide_count > 0 and slide_count <= 1000),
+  analysis_status text check (analysis_status in ('not_applicable', 'parsed', 'fallback', 'failed')),
+  analysis_warnings text[] not null default '{}',
+  storage_key text not null unique,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (storage_key like ('rooms/' || room_id || '/files/%.pptx'))
+);
+
+create table if not exists public.slides (
+  id text primary key,
+  room_id text not null references public.rooms(id) on delete cascade,
+  file_id text not null references public.files(id) on delete cascade,
+  owner_user_id uuid not null references auth.users(id) on delete cascade,
+  owner_name text not null check (char_length(owner_name) between 1 and 120),
+  title text not null check (char_length(title) between 1 and 240),
+  section text not null default '',
+  sort_order integer not null check (sort_order > 0),
+  source_page integer not null check (source_page > 0),
+  thumbnail_url text,
+  is_placed boolean not null default true,
+  is_duplicate boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.exports (
+  id text primary key,
+  room_id text not null references public.rooms(id) on delete cascade,
+  created_by uuid not null references auth.users(id) on delete cascade,
+  file_name text not null check (char_length(file_name) between 1 and 240),
+  format text not null check (format in ('pptx', 'pdf', 'zip')),
+  status text not null check (status in ('success', 'failed')),
+  download_storage_key text,
+  error_message text,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.usage_events (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete set null,
+  room_id text references public.rooms(id) on delete set null,
+  event_type text not null,
+  quantity bigint not null default 1,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.audit_logs (
+  id uuid primary key default gen_random_uuid(),
+  actor_user_id uuid references auth.users(id) on delete set null,
+  room_id text references public.rooms(id) on delete set null,
+  action text not null,
+  target_type text,
+  target_id text,
+  ip_address inet,
+  user_agent text,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists rooms_host_user_id_idx on public.rooms(host_user_id);
+create index if not exists rooms_invite_code_idx on public.rooms(invite_code);
+create index if not exists room_members_room_id_idx on public.room_members(room_id);
+create index if not exists room_members_user_id_idx on public.room_members(user_id);
+create index if not exists files_room_id_idx on public.files(room_id);
+create index if not exists files_owner_user_id_idx on public.files(owner_user_id);
+create index if not exists slides_room_id_idx on public.slides(room_id);
+create index if not exists slides_file_id_idx on public.slides(file_id);
+create index if not exists exports_room_id_idx on public.exports(room_id);
+create index if not exists usage_events_user_id_created_at_idx on public.usage_events(user_id, created_at desc);
+create index if not exists audit_logs_room_id_created_at_idx on public.audit_logs(room_id, created_at desc);
+
+alter table public.profiles enable row level security;
+alter table public.rooms enable row level security;
+alter table public.room_members enable row level security;
+alter table public.files enable row level security;
+alter table public.slides enable row level security;
+alter table public.exports enable row level security;
+alter table public.usage_events enable row level security;
+alter table public.audit_logs enable row level security;
+
+create schema if not exists private;
+revoke all on schema private from public;
+grant usage on schema private to authenticated;
+
+drop function if exists private.is_room_member(text);
+drop function if exists private.can_manage_room(text);
+drop function if exists public.is_room_member(text);
+drop function if exists public.can_manage_room(text);
+
+create or replace function private.is_room_member(target_room_id text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, auth
+as $$
+  select exists (
+    select 1
+    from public.room_members
+    where room_id = target_room_id
+      and user_id = (select auth.uid())
+  )
+  or exists (
+    select 1
+    from public.rooms
+    where id = target_room_id
+      and host_user_id = (select auth.uid())
+  );
+$$;
+
+create or replace function private.can_manage_room(target_room_id text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, auth
+as $$
+  select exists (
+    select 1
+    from public.rooms
+    where id = target_room_id
+      and host_user_id = (select auth.uid())
+  )
+  or exists (
+    select 1
+    from public.room_members
+    where room_id = target_room_id
+      and user_id = (select auth.uid())
+      and role in ('host', 'admin')
+  );
+$$;
+
+revoke all on function private.is_room_member(text) from public;
+revoke all on function private.can_manage_room(text) from public;
+grant execute on function private.is_room_member(text) to authenticated;
+grant execute on function private.can_manage_room(text) to authenticated;
+
+drop policy if exists "profiles_select_self" on public.profiles;
+create policy "profiles_select_self"
+on public.profiles
+for select
+to authenticated
+using ((select auth.uid()) = id);
+
+drop policy if exists "profiles_insert_self" on public.profiles;
+create policy "profiles_insert_self"
+on public.profiles
+for insert
+to authenticated
+with check ((select auth.uid()) = id);
+
+drop policy if exists "profiles_update_self" on public.profiles;
+create policy "profiles_update_self"
+on public.profiles
+for update
+to authenticated
+using ((select auth.uid()) = id)
+with check ((select auth.uid()) = id);
+
+drop policy if exists "rooms_select_member" on public.rooms;
+create policy "rooms_select_member"
+on public.rooms
+for select
+to authenticated
+using (private.is_room_member(id));
+
+drop policy if exists "rooms_insert_host" on public.rooms;
+create policy "rooms_insert_host"
+on public.rooms
+for insert
+to authenticated
+with check ((select auth.uid()) = host_user_id);
+
+drop policy if exists "rooms_update_manager" on public.rooms;
+create policy "rooms_update_manager"
+on public.rooms
+for update
+to authenticated
+using (private.can_manage_room(id))
+with check (private.can_manage_room(id));
+
+drop policy if exists "rooms_delete_manager" on public.rooms;
+create policy "rooms_delete_manager"
+on public.rooms
+for delete
+to authenticated
+using (private.can_manage_room(id));
+
+drop policy if exists "room_members_select_member" on public.room_members;
+create policy "room_members_select_member"
+on public.room_members
+for select
+to authenticated
+using (private.is_room_member(room_id));
+
+drop policy if exists "room_members_insert_manager" on public.room_members;
+create policy "room_members_insert_manager"
+on public.room_members
+for insert
+to authenticated
+with check (private.can_manage_room(room_id));
+
+drop policy if exists "room_members_update_manager" on public.room_members;
+create policy "room_members_update_manager"
+on public.room_members
+for update
+to authenticated
+using (private.can_manage_room(room_id))
+with check (private.can_manage_room(room_id));
+
+drop policy if exists "room_members_delete_manager_or_self" on public.room_members;
+create policy "room_members_delete_manager_or_self"
+on public.room_members
+for delete
+to authenticated
+using (private.can_manage_room(room_id) or user_id = (select auth.uid()));
+
+drop policy if exists "files_select_member" on public.files;
+create policy "files_select_member"
+on public.files
+for select
+to authenticated
+using (private.is_room_member(room_id));
+
+drop policy if exists "files_insert_owner_member" on public.files;
+create policy "files_insert_owner_member"
+on public.files
+for insert
+to authenticated
+with check (private.is_room_member(room_id) and owner_user_id = (select auth.uid()));
+
+drop policy if exists "files_update_owner_or_manager" on public.files;
+create policy "files_update_owner_or_manager"
+on public.files
+for update
+to authenticated
+using (owner_user_id = (select auth.uid()) or private.can_manage_room(room_id))
+with check (owner_user_id = (select auth.uid()) or private.can_manage_room(room_id));
+
+drop policy if exists "files_delete_owner_or_manager" on public.files;
+create policy "files_delete_owner_or_manager"
+on public.files
+for delete
+to authenticated
+using (owner_user_id = (select auth.uid()) or private.can_manage_room(room_id));
+
+drop policy if exists "slides_select_member" on public.slides;
+create policy "slides_select_member"
+on public.slides
+for select
+to authenticated
+using (private.is_room_member(room_id));
+
+drop policy if exists "slides_insert_owner_or_manager" on public.slides;
+create policy "slides_insert_owner_or_manager"
+on public.slides
+for insert
+to authenticated
+with check (owner_user_id = (select auth.uid()) or private.can_manage_room(room_id));
+
+drop policy if exists "slides_update_member" on public.slides;
+create policy "slides_update_member"
+on public.slides
+for update
+to authenticated
+using (private.is_room_member(room_id))
+with check (private.is_room_member(room_id));
+
+drop policy if exists "slides_delete_owner_or_manager" on public.slides;
+create policy "slides_delete_owner_or_manager"
+on public.slides
+for delete
+to authenticated
+using (owner_user_id = (select auth.uid()) or private.can_manage_room(room_id));
+
+drop policy if exists "exports_select_member" on public.exports;
+create policy "exports_select_member"
+on public.exports
+for select
+to authenticated
+using (private.is_room_member(room_id));
+
+drop policy if exists "exports_insert_member_self" on public.exports;
+create policy "exports_insert_member_self"
+on public.exports
+for insert
+to authenticated
+with check (private.is_room_member(room_id) and created_by = (select auth.uid()));
+
+drop policy if exists "exports_delete_manager" on public.exports;
+create policy "exports_delete_manager"
+on public.exports
+for delete
+to authenticated
+using (private.can_manage_room(room_id));
+
+drop policy if exists "usage_events_select_self" on public.usage_events;
+create policy "usage_events_select_self"
+on public.usage_events
+for select
+to authenticated
+using (user_id = (select auth.uid()));
+
+drop policy if exists "usage_events_insert_self" on public.usage_events;
+create policy "usage_events_insert_self"
+on public.usage_events
+for insert
+to authenticated
+with check (user_id = (select auth.uid()));
+
+drop policy if exists "audit_logs_select_room_manager" on public.audit_logs;
+create policy "audit_logs_select_room_manager"
+on public.audit_logs
+for select
+to authenticated
+using (room_id is not null and private.can_manage_room(room_id));
+
+drop policy if exists "storage_select_room_member" on storage.objects;
+create policy "storage_select_room_member"
+on storage.objects
+for select
+to authenticated
+using (
+  bucket_id = 'slideroom-uploads'
+  and (storage.foldername(name))[1] = 'rooms'
+  and private.is_room_member((storage.foldername(name))[2])
+);
+
+drop policy if exists "storage_insert_room_member" on storage.objects;
+create policy "storage_insert_room_member"
+on storage.objects
+for insert
+to authenticated
+with check (
+  bucket_id = 'slideroom-uploads'
+  and (storage.foldername(name))[1] = 'rooms'
+  and (storage.foldername(name))[3] = 'files'
+  and name like 'rooms/%/files/%.pptx'
+  and private.is_room_member((storage.foldername(name))[2])
+);
+
+drop policy if exists "storage_update_owner_or_manager" on storage.objects;
+create policy "storage_update_owner_or_manager"
+on storage.objects
+for update
+to authenticated
+using (
+  bucket_id = 'slideroom-uploads'
+  and exists (
+    select 1
+    from public.files
+    where storage_key = storage.objects.name
+      and (owner_user_id = (select auth.uid()) or private.can_manage_room(room_id))
+  )
+)
+with check (
+  bucket_id = 'slideroom-uploads'
+  and exists (
+    select 1
+    from public.files
+    where storage_key = storage.objects.name
+      and (owner_user_id = (select auth.uid()) or private.can_manage_room(room_id))
+  )
+);
+
+drop policy if exists "storage_delete_owner_or_manager" on storage.objects;
+create policy "storage_delete_owner_or_manager"
+on storage.objects
+for delete
+to authenticated
+using (
+  bucket_id = 'slideroom-uploads'
+  and exists (
+    select 1
+    from public.files
+    where storage_key = storage.objects.name
+      and (owner_user_id = (select auth.uid()) or private.can_manage_room(room_id))
+  )
+);

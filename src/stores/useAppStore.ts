@@ -67,7 +67,7 @@ interface AppState {
   isUploading: boolean;
   isExporting: boolean;
   initializeAuth: () => Promise<void>;
-  syncFromServer: () => Promise<void>;
+  syncFromServer: (options?: { inviteCode?: string }) => Promise<void>;
   register: (input: { name: string; email: string; password: string }) => Promise<UserProfile | null>;
   login: (input: { email: string; password: string }) => Promise<void>;
   updateAccountName: (name: string) => Promise<void>;
@@ -256,8 +256,8 @@ export const useAppStore = create<AppState>()(
         });
       },
 
-      async syncFromServer() {
-        const snapshot = await loadSharedState<SharedAppSnapshot>();
+      async syncFromServer(options) {
+        const snapshot = await loadSharedState<SharedAppSnapshot>(options);
         if (!snapshot) return;
 
         set((state) => {
@@ -514,6 +514,10 @@ export const useAppStore = create<AppState>()(
       },
 
       async addFile(roomId, upload, meta) {
+        if (!get().isAuthenticated) {
+          throw new Error("ファイルをアップロードするにはログインが必要です。");
+        }
+
         await get().syncFromServer();
         const validation = validateUploadFile(upload);
         if (!validation.valid) {
@@ -530,8 +534,8 @@ export const useAppStore = create<AppState>()(
           const ownerUserId = meta?.ownerUserId ?? get().currentUser.id;
           const ownerName = meta?.ownerName ?? roomMember?.name ?? get().currentUser.name;
           const fileId = `file-${nanoid(10)}`;
-          const storageKey = `upload-${fileId}`;
-          await saveBlob(storageKey, upload);
+          const storageKey = `rooms/${roomId}/files/${fileId}-${nanoid(18)}.pptx`;
+          await saveBlob(storageKey, upload, roomId);
 
           let slideCount = inferSlideCount(upload.name, extension);
           let analysisStatus: SubmittedFile["analysisStatus"] = extension === "pptx" ? "fallback" : "not_applicable";
@@ -722,15 +726,31 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: "slideroom-state-v1",
+      version: 2,
+      migrate: (persisted) => {
+        const persistedState = persisted as Partial<AppState> | undefined;
+        return {
+          settings: persistedState?.settings,
+          selectedRoomId: persistedState?.selectedRoomId,
+          searchQuery: persistedState?.searchQuery,
+          roomFilter: persistedState?.roomFilter,
+          fileFilter: persistedState?.fileFilter,
+          sortMode: persistedState?.sortMode,
+        };
+      },
       merge: (persisted, current) => {
         const persistedState = persisted as Partial<AppState> | undefined;
         return {
           ...current,
-          ...persistedState,
           currentUser: signedOutUser,
           isAuthenticated: false,
           authReady: false,
           isEmailVerified: false,
+          selectedRoomId: persistedState?.selectedRoomId,
+          searchQuery: persistedState?.searchQuery ?? "",
+          roomFilter: persistedState?.roomFilter ?? "all",
+          fileFilter: persistedState?.fileFilter ?? "all",
+          sortMode: persistedState?.sortMode ?? "updated",
           settings: {
             ...defaultSettings,
             ...(persistedState?.settings ?? {}),
@@ -742,13 +762,12 @@ export const useAppStore = create<AppState>()(
         };
       },
       partialize: (state) => ({
-        rooms: state.rooms,
-        members: state.members,
-        files: state.files,
-        slides: state.slides,
-        exportRecords: state.exportRecords,
         settings: state.settings,
         selectedRoomId: state.selectedRoomId,
+        searchQuery: state.searchQuery,
+        roomFilter: state.roomFilter,
+        fileFilter: state.fileFilter,
+        sortMode: state.sortMode,
       }),
     },
   ),

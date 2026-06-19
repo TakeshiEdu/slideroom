@@ -1,11 +1,21 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import {
+  canUserAccessStorageKey,
+  canUserUploadToRoom,
+  canUserWriteStorageKey,
+  checkRateLimit,
   getBlobKeyFromUrl,
+  getRoomIdFromRequestQuery,
   getSupabaseAdmin,
   handleOptions,
+  HttpError,
+  loadSharedState,
   readRequestBody,
+  requireAuthenticatedUser,
+  requireSameOrigin,
   sendJson,
   setApiHeaders,
+  storageKeyBelongsToRoom,
   STORAGE_BUCKET,
 } from "../_shared.js";
 
@@ -22,15 +32,26 @@ export default async function handler(request: IncomingMessage, response: Server
   const storage = supabase.storage.from(STORAGE_BUCKET);
 
   try {
+    requireSameOrigin(request);
+    const user = await requireAuthenticatedUser(request, response);
+    const loaded = await loadSharedState();
+    const state = loaded.state ?? {};
+
     if (request.method === "GET") {
+      checkRateLimit(request, "blob:get", 120);
+      if (!canUserAccessStorageKey(state, key, user.id)) {
+        sendJson(response, 403, { ok: false, error: "Forbidden" }, request);
+        return;
+      }
+
       const { data, error } = await storage.download(key);
       if (error || !data) {
-        sendJson(response, 404, { ok: false, error: error?.message || "Blob not found" });
+        sendJson(response, 404, { ok: false, error: error?.message || "Blob not found" }, request);
         return;
       }
 
       const bytes = Buffer.from(await data.arrayBuffer());
-      setApiHeaders(response);
+      setApiHeaders(response, request);
       response.statusCode = 200;
       response.setHeader("Content-Type", data.type || "application/octet-stream");
       response.setHeader("Cache-Control", "no-store");
@@ -39,25 +60,39 @@ export default async function handler(request: IncomingMessage, response: Server
     }
 
     if (request.method === "POST") {
+      checkRateLimit(request, "blob:post", 30);
+      const roomId = getRoomIdFromRequestQuery(request);
+      if (!roomId || !storageKeyBelongsToRoom(key, roomId) || !canUserUploadToRoom(state, roomId, user.id)) {
+        sendJson(response, 403, { ok: false, error: "Forbidden" }, request);
+        return;
+      }
+
       const body = await readRequestBody(request);
       const { error } = await storage.upload(key, body, {
         contentType: request.headers["content-type"] || "application/octet-stream",
         upsert: true,
       });
       if (error) throw error;
-      sendJson(response, 200, { ok: true, key, size: body.length });
+      sendJson(response, 200, { ok: true, key, size: body.length }, request);
       return;
     }
 
     if (request.method === "DELETE") {
+      checkRateLimit(request, "blob:delete", 60);
+      if (!canUserWriteStorageKey(state, key, user.id)) {
+        sendJson(response, 403, { ok: false, error: "Forbidden" }, request);
+        return;
+      }
+
       const { error } = await storage.remove([key]);
       if (error) throw error;
-      sendJson(response, 200, { ok: true });
+      sendJson(response, 200, { ok: true }, request);
       return;
     }
 
-    sendJson(response, 405, { ok: false, error: "Method not allowed" });
+    sendJson(response, 405, { ok: false, error: "Method not allowed" }, request);
   } catch (error) {
-    sendJson(response, 500, { ok: false, error: error instanceof Error ? error.message : String(error) });
+    const status = error instanceof HttpError ? error.status : 500;
+    sendJson(response, status, { ok: false, error: error instanceof Error ? error.message : String(error) }, request);
   }
 }

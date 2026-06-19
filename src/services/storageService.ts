@@ -32,9 +32,10 @@ function getBrowserSupabase() {
   return browserSupabase;
 }
 
-async function requestSignedUpload(storageKey: string) {
+async function requestSignedUpload(storageKey: string, roomId: string) {
   if (!canUseServerStorage()) return undefined;
-  const response = await fetch(`/api/blob/${encodeURIComponent(storageKey)}/upload-url`, { method: "POST" });
+  const params = new URLSearchParams({ roomId });
+  const response = await fetch(`/api/blob/${encodeURIComponent(storageKey)}/upload-url?${params.toString()}`, { method: "POST" });
   if (!response.ok) return undefined;
   return (await response.json()) as { ok: boolean; bucket?: string; path: string; token: string };
 }
@@ -47,11 +48,11 @@ async function requestSignedDownload(storageKey: string) {
   return (await response.json()) as { ok: boolean; signedUrl: string };
 }
 
-async function saveServerBlob(storageKey: string, blob: Blob) {
+async function saveServerBlob(storageKey: string, blob: Blob, roomId: string) {
   if (!canUseServerStorage()) return;
 
   const supabase = getBrowserSupabase();
-  const signedUpload = await requestSignedUpload(storageKey);
+  const signedUpload = await requestSignedUpload(storageKey, roomId);
   if (supabase && signedUpload?.token) {
     const { error } = await supabase.storage
       .from(signedUpload.bucket || SUPABASE_STORAGE_BUCKET)
@@ -60,7 +61,8 @@ async function saveServerBlob(storageKey: string, blob: Blob) {
     return;
   }
 
-  const response = await fetch(`/api/blob/${encodeURIComponent(storageKey)}`, {
+  const params = new URLSearchParams({ roomId });
+  const response = await fetch(`/api/blob/${encodeURIComponent(storageKey)}?${params.toString()}`, {
     method: "POST",
     body: blob,
   });
@@ -106,11 +108,9 @@ async function getDb() {
   });
 }
 
-export async function saveBlob(storageKey: string, blob: Blob) {
-  try {
-    await saveServerBlob(storageKey, blob);
-  } catch (error) {
-    console.warn("Server blob save skipped", error);
+export async function saveBlob(storageKey: string, blob: Blob, roomId: string) {
+  if (canUseServerStorage()) {
+    await saveServerBlob(storageKey, blob, roomId);
   }
 
   const db = await getDb();
@@ -152,10 +152,13 @@ export interface SharedStateResponse<T> {
   state: T | null;
 }
 
-export async function loadSharedState<T>() {
+export async function loadSharedState<T>(options?: { inviteCode?: string }) {
   if (!canUseServerStorage()) return null;
   try {
-    const response = await fetch("/api/state", { cache: "no-store" });
+    const params = new URLSearchParams();
+    if (options?.inviteCode) params.set("inviteCode", options.inviteCode);
+    const url = params.size > 0 ? `/api/state?${params.toString()}` : "/api/state";
+    const response = await fetch(url, { cache: "no-store" });
     if (!response.ok) return null;
     const payload = (await response.json()) as SharedStateResponse<T>;
     return payload.initialized ? payload.state : null;

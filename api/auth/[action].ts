@@ -1,17 +1,21 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import {
   appendSetCookie,
+  checkRateLimit,
   getRequestCookies,
   getSupabaseServerAnonKey,
   getSupabaseUrl,
   handleOptions,
+  HttpError,
   readRequestBody,
+  requireSameOrigin,
   sendJson,
 } from "../_shared.js";
 
 const ACCESS_COOKIE = "slideroom-access-token";
 const REFRESH_COOKIE = "slideroom-refresh-token";
 const REFRESH_MAX_AGE = 60 * 60 * 24 * 30;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 interface SupabaseUser {
   id: string;
@@ -77,6 +81,26 @@ async function readJsonBody<T>(request: IncomingMessage): Promise<T> {
   return JSON.parse(body.toString("utf8")) as T;
 }
 
+function normalizeEmail(value: unknown) {
+  if (typeof value !== "string") throw new HttpError(400, "Invalid email");
+  const email = value.trim().toLowerCase();
+  if (!EMAIL_PATTERN.test(email) || email.length > 254) throw new HttpError(400, "Invalid email");
+  return email;
+}
+
+function normalizeDisplayName(value: unknown) {
+  if (typeof value !== "string") throw new HttpError(400, "Invalid display name");
+  const name = value.trim();
+  if (name.length < 1 || name.length > 80) throw new HttpError(400, "Invalid display name");
+  return name;
+}
+
+function normalizePassword(value: unknown) {
+  if (typeof value !== "string") throw new HttpError(400, "Invalid password");
+  if (value.length < 8 || value.length > 128) throw new HttpError(400, "Invalid password");
+  return value;
+}
+
 async function supabaseAuth<T>(
   path: string,
   init: RequestInit = {},
@@ -134,15 +158,29 @@ function getAction(request: IncomingMessage) {
   return decodeURIComponent(url.pathname.slice("/api/auth/".length));
 }
 
-function withRedirect(path: string, redirectTo?: string) {
+function safeRedirectTo(request: IncomingMessage, redirectTo?: string) {
+  if (!redirectTo) return undefined;
+  const requestOrigin = `${isSecureRequest(request) ? "https" : "http"}://${request.headers.host || "localhost"}`;
+  try {
+    const url = new URL(redirectTo);
+    if (url.origin !== requestOrigin) throw new HttpError(400, "Invalid redirect URL");
+    return url.toString();
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new HttpError(400, "Invalid redirect URL");
+  }
+}
+
+function withRedirect(request: IncomingMessage, path: string, redirectTo?: string) {
   if (!redirectTo) return path;
-  return `${path}?redirect_to=${encodeURIComponent(redirectTo)}`;
+  return `${path}?redirect_to=${encodeURIComponent(safeRedirectTo(request, redirectTo))}`;
 }
 
 export default async function handler(request: IncomingMessage, response: ServerResponse) {
   if (handleOptions(request, response)) return;
 
   try {
+    requireSameOrigin(request);
     const action = getAction(request);
 
     if (request.method === "GET" && action === "user") {
@@ -152,12 +190,13 @@ export default async function handler(request: IncomingMessage, response: Server
     }
 
     if (request.method === "POST" && action === "login") {
+      checkRateLimit(request, "auth:login", 10);
       const input = await readJsonBody<{ email: string; password: string }>(request);
       const session = await supabaseAuth<SupabaseSessionResponse>("/token?grant_type=password", {
         method: "POST",
         body: JSON.stringify({
-          email: input.email?.trim().toLowerCase(),
-          password: input.password,
+          email: normalizeEmail(input.email),
+          password: normalizePassword(input.password),
         }),
       });
       setAuthCookies(response, request, session);
@@ -166,13 +205,14 @@ export default async function handler(request: IncomingMessage, response: Server
     }
 
     if (request.method === "POST" && action === "signup") {
+      checkRateLimit(request, "auth:signup", 6);
       const input = await readJsonBody<{ name: string; email: string; password: string; emailRedirectTo?: string }>(request);
-      const session = await supabaseAuth<SupabaseSessionResponse>(withRedirect("/signup", input.emailRedirectTo), {
+      const session = await supabaseAuth<SupabaseSessionResponse>(withRedirect(request, "/signup", input.emailRedirectTo), {
         method: "POST",
         body: JSON.stringify({
-          email: input.email?.trim().toLowerCase(),
-          password: input.password,
-          data: { display_name: input.name?.trim() },
+          email: normalizeEmail(input.email),
+          password: normalizePassword(input.password),
+          data: { display_name: normalizeDisplayName(input.name) },
           gotrue_meta_security: {},
         }),
       });
@@ -182,13 +222,14 @@ export default async function handler(request: IncomingMessage, response: Server
     }
 
     if (request.method === "POST" && action === "verify-otp") {
+      checkRateLimit(request, "auth:verify-otp", 12);
       const input = await readJsonBody<{ email: string; token: string }>(request);
       const session = await supabaseAuth<SupabaseSessionResponse>("/verify", {
         method: "POST",
         body: JSON.stringify({
           type: "signup",
-          email: input.email?.trim().toLowerCase(),
-          token: input.token?.trim(),
+          email: normalizeEmail(input.email),
+          token: String(input.token || "").trim().slice(0, 12),
         }),
       });
       setAuthCookies(response, request, session);
@@ -197,9 +238,14 @@ export default async function handler(request: IncomingMessage, response: Server
     }
 
     if (request.method === "POST" && action === "session") {
+      checkRateLimit(request, "auth:session", 12);
       const session = await readJsonBody<SupabaseSessionResponse>(request);
-      setAuthCookies(response, request, session);
       const user = session.user || (session.access_token ? await supabaseAuth<SupabaseUser>("/user", { method: "GET" }, session.access_token) : null);
+      if (!session.access_token || !session.refresh_token || !user) {
+        sendJson(response, 401, { ok: false, error: "Invalid session" });
+        return;
+      }
+      setAuthCookies(response, request, session);
       sendJson(response, 200, { ok: true, user: user ? toUserProfile(user) : null });
       return;
     }
@@ -219,6 +265,7 @@ export default async function handler(request: IncomingMessage, response: Server
     }
 
     if (request.method === "POST" && action === "profile-name") {
+      checkRateLimit(request, "auth:profile-name", 30);
       const accessToken = await getAccessToken(request, response);
       if (!accessToken) {
         sendJson(response, 401, { ok: false, error: "Not authenticated" });
@@ -227,13 +274,14 @@ export default async function handler(request: IncomingMessage, response: Server
       const input = await readJsonBody<{ name: string }>(request);
       const user = await supabaseAuth<SupabaseUser>("/user", {
         method: "PUT",
-        body: JSON.stringify({ data: { display_name: input.name?.trim() } }),
+        body: JSON.stringify({ data: { display_name: normalizeDisplayName(input.name) } }),
       }, accessToken);
       sendJson(response, 200, { ok: true, user: toUserProfile(user) });
       return;
     }
 
     if (request.method === "POST" && action === "password") {
+      checkRateLimit(request, "auth:password", 8);
       const accessToken = await getAccessToken(request, response);
       if (!accessToken) {
         sendJson(response, 401, { ok: false, error: "Not authenticated" });
@@ -242,23 +290,24 @@ export default async function handler(request: IncomingMessage, response: Server
       const input = await readJsonBody<{ password: string }>(request);
       await supabaseAuth<SupabaseUser>("/user", {
         method: "PUT",
-        body: JSON.stringify({ password: input.password }),
+        body: JSON.stringify({ password: normalizePassword(input.password) }),
       }, accessToken);
       sendJson(response, 200, { ok: true });
       return;
     }
 
     if (request.method === "POST" && action === "email") {
+      checkRateLimit(request, "auth:email", 8);
       const accessToken = await getAccessToken(request, response);
       if (!accessToken) {
         sendJson(response, 401, { ok: false, error: "Not authenticated" });
         return;
       }
       const input = await readJsonBody<{ email: string; emailRedirectTo?: string }>(request);
-      await supabaseAuth<SupabaseUser>(withRedirect("/user", input.emailRedirectTo), {
+      await supabaseAuth<SupabaseUser>(withRedirect(request, "/user", input.emailRedirectTo), {
         method: "PUT",
         body: JSON.stringify({
-          email: input.email?.trim().toLowerCase(),
+          email: normalizeEmail(input.email),
         }),
       }, accessToken);
       sendJson(response, 200, { ok: true });
@@ -266,11 +315,12 @@ export default async function handler(request: IncomingMessage, response: Server
     }
 
     if (request.method === "POST" && action === "password-reset") {
+      checkRateLimit(request, "auth:password-reset", 5);
       const input = await readJsonBody<{ email: string; redirectTo?: string }>(request);
-      await supabaseAuth(withRedirect("/recover", input.redirectTo), {
+      await supabaseAuth(withRedirect(request, "/recover", input.redirectTo), {
         method: "POST",
         body: JSON.stringify({
-          email: input.email?.trim().toLowerCase(),
+          email: normalizeEmail(input.email),
           gotrue_meta_security: {},
         }),
       });
@@ -279,12 +329,13 @@ export default async function handler(request: IncomingMessage, response: Server
     }
 
     if (request.method === "POST" && action === "resend") {
+      checkRateLimit(request, "auth:resend", 5);
       const input = await readJsonBody<{ email: string; emailRedirectTo?: string }>(request);
-      await supabaseAuth(withRedirect("/resend", input.emailRedirectTo), {
+      await supabaseAuth(withRedirect(request, "/resend", input.emailRedirectTo), {
         method: "POST",
         body: JSON.stringify({
           type: "signup",
-          email: input.email?.trim().toLowerCase(),
+          email: normalizeEmail(input.email),
         }),
       });
       sendJson(response, 200, { ok: true });
@@ -293,6 +344,7 @@ export default async function handler(request: IncomingMessage, response: Server
 
     sendJson(response, 404, { ok: false, error: "Auth action not found" });
   } catch (error) {
-    sendJson(response, 500, { ok: false, error: error instanceof Error ? error.message : String(error) });
+    const status = error instanceof HttpError ? error.status : 500;
+    sendJson(response, status, { ok: false, error: error instanceof Error ? error.message : String(error) }, request);
   }
 }
