@@ -456,7 +456,7 @@ export function storageKeyBelongsToRoom(storageKey: string, roomId: string) {
   return (storageKey.startsWith(`rooms/${roomId}/files/`) && storageKey.endsWith(".pptx")) || /^upload-file-[A-Za-z0-9_-]+$/.test(storageKey) || /^upload-[A-Za-z0-9_-]+$/.test(storageKey);
 }
 
-function sanitizeFile(item: FileLike, roomIds: Set<string>, userId: string, existing?: FileLike, adminRoomIds = new Set<string>()) {
+function sanitizeFile(item: FileLike, roomIds: Set<string>, userId: string, existing?: FileLike, adminRoomIds = new Set<string>()): FileLike | null {
   const sanitized = sanitizeItem(item, roomIds);
   if (!sanitized) return null;
   const ownerUserId = adminRoomIds.has(item.roomId!) ? cleanText(item.ownerUserId, existing?.ownerUserId || userId, MAX_ID_LENGTH) : userId;

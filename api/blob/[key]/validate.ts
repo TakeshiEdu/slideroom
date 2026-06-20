@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { validatePptxUpload } from "../../_pptxValidation.js";
 import {
   canUserUploadToRoom,
   checkRateLimit,
@@ -23,20 +24,18 @@ export default async function handler(request: IncomingMessage, response: Server
     return;
   }
 
-  if (process.env.SLIDEROOM_ENABLE_SIGNED_UPLOADS !== "true") {
-    sendJson(response, 404, { ok: false, error: "Signed uploads are disabled" }, request);
-    return;
-  }
-
-  const key = getBlobKeyFromUrl(request, "/upload-url");
+  const key = getBlobKeyFromUrl(request, "/validate");
   if (!key) {
     sendJson(response, 400, { ok: false, error: "Invalid storage key" }, request);
     return;
   }
 
+  const supabase = getSupabaseAdmin();
+  const storage = supabase.storage.from(STORAGE_BUCKET);
+
   try {
     requireSameOrigin(request);
-    checkRateLimit(request, "blob:upload-url", 30);
+    checkRateLimit(request, "blob:validate", 30);
     const user = await requireAuthenticatedUser(request, response);
     const roomId = getRoomIdFromRequestQuery(request);
     const loaded = await loadSharedState();
@@ -45,9 +44,23 @@ export default async function handler(request: IncomingMessage, response: Server
       return;
     }
 
-    const { data, error } = await getSupabaseAdmin().storage.from(STORAGE_BUCKET).createSignedUploadUrl(key);
-    if (error || !data) throw error || new Error("Signed upload URL was not created");
-    sendJson(response, 200, { ok: true, bucket: STORAGE_BUCKET, path: data.path, token: data.token }, request);
+    const { data, error } = await storage.download(key);
+    if (error || !data) {
+      sendJson(response, 404, { ok: false, error: error?.message || "Blob not found" }, request);
+      return;
+    }
+
+    const buffer = Buffer.from(await data.arrayBuffer());
+    try {
+      const summary = validatePptxUpload(buffer, {
+        storageKey: key,
+        contentType: data.type,
+      });
+      sendJson(response, 200, { ok: true, key, summary }, request);
+    } catch (validationError) {
+      await storage.remove([key]);
+      throw validationError;
+    }
   } catch (error) {
     const status = error instanceof HttpError ? error.status : 500;
     sendJson(response, status, { ok: false, error: error instanceof Error ? error.message : String(error) }, request);

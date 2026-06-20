@@ -34,6 +34,7 @@ function getBrowserSupabase() {
 
 async function requestSignedUpload(storageKey: string, roomId: string) {
   if (!canUseServerStorage()) return undefined;
+  if (import.meta.env.VITE_ENABLE_SIGNED_UPLOADS !== "true") return undefined;
   const params = new URLSearchParams({ roomId });
   const response = await fetch(`/api/blob/${encodeURIComponent(storageKey)}/upload-url?${params.toString()}`, { method: "POST" });
   if (!response.ok) return undefined;
@@ -48,6 +49,19 @@ async function requestSignedDownload(storageKey: string) {
   return (await response.json()) as { ok: boolean; signedUrl: string };
 }
 
+async function requestStoredPptxValidation(storageKey: string, roomId: string) {
+  if (!canUseServerStorage()) return;
+  const params = new URLSearchParams({ roomId });
+  const response = await fetch(`/api/blob/${encodeURIComponent(storageKey)}/validate?${params.toString()}`, {
+    method: "POST",
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null) as { error?: string } | null;
+    throw new Error(payload?.error || `PPTX validation failed: ${response.status}`);
+  }
+}
+
 async function saveServerBlob(storageKey: string, blob: Blob, roomId: string) {
   if (!canUseServerStorage()) return;
 
@@ -58,6 +72,7 @@ async function saveServerBlob(storageKey: string, blob: Blob, roomId: string) {
       .from(signedUpload.bucket || SUPABASE_STORAGE_BUCKET)
       .uploadToSignedUrl(signedUpload.path, signedUpload.token, blob);
     if (error) throw error;
+    await requestStoredPptxValidation(storageKey, roomId);
     return;
   }
 

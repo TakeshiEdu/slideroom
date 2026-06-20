@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { validatePptxUpload } from "../_pptxValidation.js";
 import {
   canUserAccessStorageKey,
   canUserUploadToRoom,
@@ -68,8 +69,12 @@ export default async function handler(request: IncomingMessage, response: Server
       }
 
       const body = await readRequestBody(request);
+      validatePptxUpload(body, {
+        storageKey: key,
+        contentType: request.headers["content-type"],
+      });
       const { error } = await storage.upload(key, body, {
-        contentType: request.headers["content-type"] || "application/octet-stream",
+        contentType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
         upsert: true,
       });
       if (error) throw error;
