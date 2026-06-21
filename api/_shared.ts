@@ -49,6 +49,12 @@ export const STATE_ID = process.env.SLIDEROOM_STATE_ID ?? "global-dev";
 export const STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET ?? "slideroom-uploads";
 export const MAX_UPLOAD_BYTES = Number(process.env.SLIDEROOM_MAX_UPLOAD_BYTES ?? 300 * 1024 * 1024);
 export const MAX_STATE_BYTES = 1024 * 1024;
+export const MAX_ROOMS_PER_USER = Number(process.env.SLIDEROOM_MAX_ROOMS_PER_USER ?? "20");
+export const MAX_MEMBERS_PER_ROOM = Number(process.env.SLIDEROOM_MAX_MEMBERS_PER_ROOM ?? "100");
+export const MAX_FILES_PER_ROOM = Number(process.env.SLIDEROOM_MAX_FILES_PER_ROOM ?? "60");
+export const MAX_SLIDES_PER_ROOM = Number(process.env.SLIDEROOM_MAX_SLIDES_PER_ROOM ?? "500");
+export const MAX_EXPORT_RECORDS_PER_ROOM = Number(process.env.SLIDEROOM_MAX_EXPORT_RECORDS_PER_ROOM ?? "30");
+export const MAX_ROOM_STORAGE_BYTES = Number(process.env.SLIDEROOM_MAX_ROOM_STORAGE_BYTES ?? 1024 * 1024 * 1024);
 export const ACCESS_COOKIE = "slideroom-access-token";
 export const REFRESH_COOKIE = "slideroom-refresh-token";
 export const REFRESH_MAX_AGE = 60 * 60 * 24 * 30;
@@ -376,6 +382,11 @@ function cleanIsoDate(value: unknown) {
   return Number.isNaN(timestamp) ? undefined : new Date(timestamp).toISOString();
 }
 
+function cleanNonNegativeInteger(value: unknown, fallback = 0) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return Math.max(0, Math.floor(value));
+}
+
 function createEmptySharedState(): SharedAppState {
   return {
     rooms: [],
@@ -485,15 +496,64 @@ function sanitizeFile(item: FileLike, roomIds: Set<string>, userId: string, exis
   if (!sanitized) return null;
   const ownerUserId = adminRoomIds.has(item.roomId!) ? cleanText(item.ownerUserId, existing?.ownerUserId || userId, MAX_ID_LENGTH) : userId;
   const storageKey = item.storageKey ? safeStorageKey(item.storageKey) : undefined;
+  const size = cleanNonNegativeInteger(item.size, existing?.size ?? 0);
   if (storageKey && !storageKeyBelongsToRoom(storageKey, item.roomId!)) return null;
   if (item.extension && item.extension !== "pptx") return null;
-  if (typeof item.size === "number" && item.size > MAX_UPLOAD_BYTES) return null;
+  if (size > MAX_UPLOAD_BYTES) return null;
   return {
     ...item,
     ownerUserId,
     extension: "pptx",
+    size,
     storageKey,
   };
+}
+
+function countByRoom<T extends { roomId?: string }>(items: T[]) {
+  const counts = new Map<string, number>();
+  items.forEach((item) => {
+    if (!item.roomId) return;
+    counts.set(item.roomId, (counts.get(item.roomId) ?? 0) + 1);
+  });
+  return counts;
+}
+
+function sumFileBytesByRoom(files: FileLike[]) {
+  const totals = new Map<string, number>();
+  files.forEach((file) => {
+    if (!file.roomId) return;
+    totals.set(file.roomId, (totals.get(file.roomId) ?? 0) + cleanNonNegativeInteger(file.size));
+  });
+  return totals;
+}
+
+function enforceQuota(condition: boolean, message: string, status = 422) {
+  if (!condition) throw new HttpError(status, message);
+}
+
+function enforceSharedStateQuotas(state: SharedAppState, userId: string, affectedRoomIds: Set<string>) {
+  const rooms = toArray(state.rooms);
+  const hostedRoomIds = rooms
+    .filter((room) => room.hostUserId === userId)
+    .map((room) => room.id)
+    .filter((id): id is string => Boolean(id));
+
+  enforceQuota(hostedRoomIds.length <= MAX_ROOMS_PER_USER, "Room limit exceeded");
+
+  const roomIdsToCheck = new Set([...affectedRoomIds, ...hostedRoomIds]);
+  const membersByRoom = countByRoom(toArray(state.members));
+  const filesByRoom = countByRoom(toArray(state.files));
+  const slidesByRoom = countByRoom(toArray(state.slides));
+  const exportsByRoom = countByRoom(toArray(state.exportRecords));
+  const bytesByRoom = sumFileBytesByRoom(toArray(state.files));
+
+  roomIdsToCheck.forEach((roomId) => {
+    enforceQuota((membersByRoom.get(roomId) ?? 0) <= MAX_MEMBERS_PER_ROOM, "Room member limit exceeded");
+    enforceQuota((filesByRoom.get(roomId) ?? 0) <= MAX_FILES_PER_ROOM, "Room file limit exceeded");
+    enforceQuota((slidesByRoom.get(roomId) ?? 0) <= MAX_SLIDES_PER_ROOM, "Room slide limit exceeded");
+    enforceQuota((exportsByRoom.get(roomId) ?? 0) <= MAX_EXPORT_RECORDS_PER_ROOM, "Export history limit exceeded");
+    enforceQuota((bytesByRoom.get(roomId) ?? 0) <= MAX_ROOM_STORAGE_BYTES, "Room storage limit exceeded", 413);
+  });
 }
 
 export function canUserAccessRoom(state: SharedAppState, roomId: string, userId?: string) {
@@ -591,24 +651,30 @@ export function mergeAuthorizedSharedState(current: SharedAppState, incoming: Sh
     .filter((file) => adminOrNewRoomIds.has(file.roomId!) || file.ownerUserId === userId)
     .map((file) => sanitizeFile(file, memberWritableRoomIds, userId, existingFileById.get(file.id || ""), adminOrNewRoomIds))
     .filter((file): file is FileLike => Boolean(file));
+  const nextFiles = keepCollection(toArray(current.files), memberWritableRoomIds).concat(incomingFiles);
+  const nextFileById = new Map(nextFiles.filter((file) => file.id).map((file) => [file.id!, file]));
 
   const incomingSlides = toArray(incoming.slides)
     .filter((slide) => slide.roomId && memberWritableRoomIds.has(slide.roomId))
     .filter((slide) => adminOrNewRoomIds.has(slide.roomId!) || slide.ownerUserId === userId)
-    .filter((slide) => sanitizeItem(slide, memberWritableRoomIds));
+    .filter((slide) => sanitizeItem(slide, memberWritableRoomIds))
+    .filter((slide) => slide.fileId && nextFileById.get(slide.fileId)?.roomId === slide.roomId);
 
   const incomingExports = toArray(incoming.exportRecords)
     .filter((record) => record.roomId && adminOrNewRoomIds.has(record.roomId));
 
-  return {
+  const nextState = {
     ...createEmptySharedState(),
     rooms: nextRooms,
     members: keepCollection(toArray(current.members), memberWritableRoomIds).concat(incomingMembers),
-    files: keepCollection(toArray(current.files), memberWritableRoomIds).concat(incomingFiles),
+    files: nextFiles,
     slides: keepCollection(toArray(current.slides), memberWritableRoomIds).concat(incomingSlides),
     exportRecords: keepCollection(toArray(current.exportRecords), adminOrNewRoomIds).concat(incomingExports),
     settings: current.settings && isRecord(current.settings) ? current.settings : {},
   };
+
+  enforceSharedStateQuotas(nextState, userId, new Set([...memberWritableRoomIds, ...adminOrNewRoomIds]));
+  return nextState;
 }
 
 async function removeStorageObjects(storageKeys: string[]) {
