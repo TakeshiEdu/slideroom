@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import {
   appendSetCookie,
-  checkRateLimit,
+  checkDurableRateLimit,
   getRequestCookies,
   getSupabaseServerAnonKey,
   getSupabaseUrl,
@@ -190,7 +190,7 @@ export default async function handler(request: IncomingMessage, response: Server
     }
 
     if (request.method === "POST" && action === "login") {
-      checkRateLimit(request, "auth:login", 10);
+      await checkDurableRateLimit(request, "auth:login", 10);
       const input = await readJsonBody<{ email: string; password: string }>(request);
       const session = await supabaseAuth<SupabaseSessionResponse>("/token?grant_type=password", {
         method: "POST",
@@ -205,7 +205,7 @@ export default async function handler(request: IncomingMessage, response: Server
     }
 
     if (request.method === "POST" && action === "signup") {
-      checkRateLimit(request, "auth:signup", 6);
+      await checkDurableRateLimit(request, "auth:signup", 6);
       const input = await readJsonBody<{ name: string; email: string; password: string; emailRedirectTo?: string }>(request);
       const session = await supabaseAuth<SupabaseSessionResponse>(withRedirect(request, "/signup", input.emailRedirectTo), {
         method: "POST",
@@ -222,7 +222,7 @@ export default async function handler(request: IncomingMessage, response: Server
     }
 
     if (request.method === "POST" && action === "verify-otp") {
-      checkRateLimit(request, "auth:verify-otp", 12);
+      await checkDurableRateLimit(request, "auth:verify-otp", 12);
       const input = await readJsonBody<{ email: string; token: string }>(request);
       const session = await supabaseAuth<SupabaseSessionResponse>("/verify", {
         method: "POST",
@@ -238,7 +238,7 @@ export default async function handler(request: IncomingMessage, response: Server
     }
 
     if (request.method === "POST" && action === "session") {
-      checkRateLimit(request, "auth:session", 12);
+      await checkDurableRateLimit(request, "auth:session", 12);
       const session = await readJsonBody<SupabaseSessionResponse>(request);
       const user = session.user || (session.access_token ? await supabaseAuth<SupabaseUser>("/user", { method: "GET" }, session.access_token) : null);
       if (!session.access_token || !session.refresh_token || !user) {
@@ -265,7 +265,7 @@ export default async function handler(request: IncomingMessage, response: Server
     }
 
     if (request.method === "POST" && action === "profile-name") {
-      checkRateLimit(request, "auth:profile-name", 30);
+      await checkDurableRateLimit(request, "auth:profile-name", 30);
       const accessToken = await getAccessToken(request, response);
       if (!accessToken) {
         sendJson(response, 401, { ok: false, error: "Not authenticated" });
@@ -281,7 +281,7 @@ export default async function handler(request: IncomingMessage, response: Server
     }
 
     if (request.method === "POST" && action === "password") {
-      checkRateLimit(request, "auth:password", 8);
+      await checkDurableRateLimit(request, "auth:password", 8);
       const accessToken = await getAccessToken(request, response);
       if (!accessToken) {
         sendJson(response, 401, { ok: false, error: "Not authenticated" });
@@ -297,7 +297,7 @@ export default async function handler(request: IncomingMessage, response: Server
     }
 
     if (request.method === "POST" && action === "email") {
-      checkRateLimit(request, "auth:email", 8);
+      await checkDurableRateLimit(request, "auth:email", 8);
       const accessToken = await getAccessToken(request, response);
       if (!accessToken) {
         sendJson(response, 401, { ok: false, error: "Not authenticated" });
@@ -315,7 +315,7 @@ export default async function handler(request: IncomingMessage, response: Server
     }
 
     if (request.method === "POST" && action === "password-reset") {
-      checkRateLimit(request, "auth:password-reset", 5);
+      await checkDurableRateLimit(request, "auth:password-reset", 5);
       const input = await readJsonBody<{ email: string; redirectTo?: string }>(request);
       await supabaseAuth(withRedirect(request, "/recover", input.redirectTo), {
         method: "POST",
@@ -329,7 +329,7 @@ export default async function handler(request: IncomingMessage, response: Server
     }
 
     if (request.method === "POST" && action === "resend") {
-      checkRateLimit(request, "auth:resend", 5);
+      await checkDurableRateLimit(request, "auth:resend", 5);
       const input = await readJsonBody<{ email: string; emailRedirectTo?: string }>(request);
       await supabaseAuth(withRedirect(request, "/resend", input.emailRedirectTo), {
         method: "POST",

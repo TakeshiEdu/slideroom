@@ -4,7 +4,7 @@ import {
   canUserAccessStorageKey,
   canUserUploadToRoom,
   canUserWriteStorageKey,
-  checkRateLimit,
+  checkDurableRateLimit,
   getBlobKeyFromUrl,
   getRoomIdFromRequestQuery,
   getSupabaseAdmin,
@@ -39,7 +39,7 @@ export default async function handler(request: IncomingMessage, response: Server
     const state = loaded.state ?? {};
 
     if (request.method === "GET") {
-      checkRateLimit(request, "blob:get", 120);
+      await checkDurableRateLimit(request, "blob:get", 120);
       if (!canUserAccessStorageKey(state, key, user.id)) {
         sendJson(response, 403, { ok: false, error: "Forbidden" }, request);
         return;
@@ -61,7 +61,7 @@ export default async function handler(request: IncomingMessage, response: Server
     }
 
     if (request.method === "POST") {
-      checkRateLimit(request, "blob:post", 30);
+      await checkDurableRateLimit(request, "blob:post", 30);
       const roomId = getRoomIdFromRequestQuery(request);
       if (!roomId || !storageKeyBelongsToRoom(key, roomId) || !canUserUploadToRoom(state, roomId, user.id)) {
         sendJson(response, 403, { ok: false, error: "Forbidden" }, request);
@@ -83,7 +83,7 @@ export default async function handler(request: IncomingMessage, response: Server
     }
 
     if (request.method === "DELETE") {
-      checkRateLimit(request, "blob:delete", 60);
+      await checkDurableRateLimit(request, "blob:delete", 60);
       if (!canUserWriteStorageKey(state, key, user.id)) {
         sendJson(response, 403, { ok: false, error: "Forbidden" }, request);
         return;

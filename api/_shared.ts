@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createHash } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 interface RoomLike {
@@ -262,6 +263,29 @@ export function checkRateLimit(request: IncomingMessage, scope: string, limit: n
   }
   bucket.count += 1;
   if (bucket.count > limit) {
+    throw new HttpError(429, "Too many requests");
+  }
+}
+
+function hashRateLimitKey(value: string) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+export async function checkDurableRateLimit(request: IncomingMessage, scope: string, limit: number, windowMs = RATE_LIMIT_WINDOW_MS) {
+  checkRateLimit(request, scope, limit, windowMs);
+
+  const windowSeconds = Math.max(1, Math.ceil(windowMs / 1000));
+  const rateKey = hashRateLimitKey(`${scope}:${getClientIp(request)}`);
+  const { data, error } = await getSupabaseAdmin()
+    .rpc("check_rate_limit", {
+      rate_key: rateKey,
+      max_count: limit,
+      window_seconds: windowSeconds,
+    });
+
+  if (error) throw error;
+  const result = Array.isArray(data) ? data[0] : data;
+  if (!result?.allowed) {
     throw new HttpError(429, "Too many requests");
   }
 }

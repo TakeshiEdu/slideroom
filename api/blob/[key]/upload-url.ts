@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import {
   canUserUploadToRoom,
-  checkRateLimit,
+  checkDurableRateLimit,
   getBlobKeyFromUrl,
   getRoomIdFromRequestQuery,
   getSupabaseAdmin,
@@ -36,7 +36,7 @@ export default async function handler(request: IncomingMessage, response: Server
 
   try {
     requireSameOrigin(request);
-    checkRateLimit(request, "blob:upload-url", 30);
+    await checkDurableRateLimit(request, "blob:upload-url", 30);
     const user = await requireAuthenticatedUser(request, response);
     const roomId = getRoomIdFromRequestQuery(request);
     const loaded = await loadSharedState();

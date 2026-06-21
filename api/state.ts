@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import {
-  checkRateLimit,
+  checkDurableRateLimit,
   filterSharedStateForInvite,
   filterSharedStateForUser,
   getAuthenticatedUser,
@@ -21,7 +21,7 @@ export default async function handler(request: IncomingMessage, response: Server
   try {
     requireSameOrigin(request);
     if (request.method === "GET") {
-      checkRateLimit(request, "state:get", 120);
+      await checkDurableRateLimit(request, "state:get", 120);
       const loaded = await loadSharedState();
       if (!loaded.initialized || !loaded.state) {
         sendJson(response, 200, loaded, request);
@@ -40,7 +40,7 @@ export default async function handler(request: IncomingMessage, response: Server
     }
 
     if (request.method === "PUT") {
-      checkRateLimit(request, "state:put", 40);
+      await checkDurableRateLimit(request, "state:put", 40);
       const user = await getAuthenticatedUser(request, response);
       if (!user) {
         sendJson(response, 401, { ok: false, error: "Not authenticated" }, request);

@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { validatePptxUpload } from "../../_pptxValidation.js";
 import {
   canUserUploadToRoom,
-  checkRateLimit,
+  checkDurableRateLimit,
   getBlobKeyFromUrl,
   getRoomIdFromRequestQuery,
   getSupabaseAdmin,
@@ -35,7 +35,7 @@ export default async function handler(request: IncomingMessage, response: Server
 
   try {
     requireSameOrigin(request);
-    checkRateLimit(request, "blob:validate", 30);
+    await checkDurableRateLimit(request, "blob:validate", 30);
     const user = await requireAuthenticatedUser(request, response);
     const roomId = getRoomIdFromRequestQuery(request);
     const loaded = await loadSharedState();

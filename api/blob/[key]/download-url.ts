@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import {
   canUserAccessStorageKey,
-  checkRateLimit,
+  checkDurableRateLimit,
   getBlobKeyFromUrl,
   getSupabaseAdmin,
   handleOptions,
@@ -27,7 +27,7 @@ export default async function handler(request: IncomingMessage, response: Server
   }
 
   try {
-    checkRateLimit(request, "blob:download-url", 120);
+    await checkDurableRateLimit(request, "blob:download-url", 120);
     const user = await requireAuthenticatedUser(request, response);
     const loaded = await loadSharedState();
     if (!canUserAccessStorageKey(loaded.state ?? {}, key, user.id)) {

@@ -153,9 +153,26 @@ alter table public.audit_logs enable row level security;
 create schema if not exists private;
 revoke all on schema private from public;
 grant usage on schema private to authenticated;
+grant usage on schema private to service_role;
+
+create table if not exists private.api_rate_limits (
+  key text primary key,
+  count integer not null check (count > 0),
+  reset_at timestamptz not null,
+  updated_at timestamptz not null default now()
+);
+
+alter table private.api_rate_limits enable row level security;
+create index if not exists api_rate_limits_reset_at_idx on private.api_rate_limits(reset_at);
+revoke all on private.api_rate_limits from public;
+revoke all on private.api_rate_limits from anon;
+revoke all on private.api_rate_limits from authenticated;
+grant select, insert, update, delete on private.api_rate_limits to service_role;
 
 drop function if exists private.is_room_member(text);
 drop function if exists private.can_manage_room(text);
+drop function if exists private.check_rate_limit(text, integer, integer);
+drop function if exists public.check_rate_limit(text, integer, integer);
 drop function if exists public.is_room_member(text);
 drop function if exists public.can_manage_room(text);
 
@@ -206,6 +223,57 @@ revoke all on function private.is_room_member(text) from public;
 revoke all on function private.can_manage_room(text) from public;
 grant execute on function private.is_room_member(text) to authenticated;
 grant execute on function private.can_manage_room(text) to authenticated;
+
+create or replace function public.check_rate_limit(rate_key text, max_count integer, window_seconds integer)
+returns table (allowed boolean, remaining integer, reset_at timestamptz)
+language plpgsql
+security invoker
+set search_path = public, private, pg_temp
+as $$
+declare
+  current_count integer;
+  current_reset_at timestamptz;
+begin
+  if rate_key is null or char_length(rate_key) < 16 or char_length(rate_key) > 128 then
+    raise exception 'invalid rate limit key';
+  end if;
+  if max_count < 1 or max_count > 10000 then
+    raise exception 'invalid rate limit max_count';
+  end if;
+  if window_seconds < 1 or window_seconds > 86400 then
+    raise exception 'invalid rate limit window_seconds';
+  end if;
+
+  delete from private.api_rate_limits as limits
+  where limits.reset_at < now() - interval '1 hour';
+
+  insert into private.api_rate_limits as limits (key, count, reset_at, updated_at)
+  values (rate_key, 1, now() + make_interval(secs => window_seconds), now())
+  on conflict (key) do update
+  set
+    count = case
+      when limits.reset_at <= now() then 1
+      else limits.count + 1
+    end,
+    reset_at = case
+      when limits.reset_at <= now() then now() + make_interval(secs => window_seconds)
+      else limits.reset_at
+    end,
+    updated_at = now()
+  returning limits.count, limits.reset_at
+  into current_count, current_reset_at;
+
+  allowed := current_count <= max_count;
+  remaining := greatest(max_count - current_count, 0);
+  reset_at := current_reset_at;
+  return next;
+end;
+$$;
+
+revoke all on function public.check_rate_limit(text, integer, integer) from public;
+revoke all on function public.check_rate_limit(text, integer, integer) from anon;
+revoke all on function public.check_rate_limit(text, integer, integer) from authenticated;
+grant execute on function public.check_rate_limit(text, integer, integer) to service_role;
 
 drop policy if exists "profiles_select_self" on public.profiles;
 create policy "profiles_select_self"
