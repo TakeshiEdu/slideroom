@@ -17,6 +17,7 @@ where schemaname = 'public'
     'exports',
     'usage_events',
     'audit_logs',
+    'app_admins',
     'app_state'
   )
 order by tablename;
@@ -73,3 +74,12 @@ join pg_namespace n on n.oid = p.pronamespace
 where n.nspname = 'public'
   and p.prosecdef = true;
 
+-- 7. Admin registry must not be directly readable by browser roles.
+select
+  grantee,
+  privilege_type
+from information_schema.role_table_grants
+where table_schema = 'public'
+  and table_name = 'app_admins'
+  and grantee in ('anon', 'authenticated')
+order by grantee, privilege_type;

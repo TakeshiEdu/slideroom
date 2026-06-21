@@ -53,6 +53,12 @@ interface StateRow {
   updated_at: string;
 }
 
+interface AppAdminRow {
+  user_id: string;
+  role: "owner" | "admin" | "support";
+  created_at?: string;
+}
+
 export const ROOM_TTL_HOURS = Number(process.env.SLIDEROOM_ROOM_TTL_HOURS ?? "24");
 export const ROOM_TTL_MS = ROOM_TTL_HOURS * 60 * 60 * 1000;
 export const STATE_ID = process.env.SLIDEROOM_STATE_ID ?? "global-dev";
@@ -65,6 +71,10 @@ export const MAX_FILES_PER_ROOM = Number(process.env.SLIDEROOM_MAX_FILES_PER_ROO
 export const MAX_SLIDES_PER_ROOM = Number(process.env.SLIDEROOM_MAX_SLIDES_PER_ROOM ?? "500");
 export const MAX_EXPORT_RECORDS_PER_ROOM = Number(process.env.SLIDEROOM_MAX_EXPORT_RECORDS_PER_ROOM ?? "30");
 export const MAX_ROOM_STORAGE_BYTES = Number(process.env.SLIDEROOM_MAX_ROOM_STORAGE_BYTES ?? 1024 * 1024 * 1024);
+export const ADMIN_EMAILS = (process.env.SLIDEROOM_ADMIN_EMAILS ?? "")
+  .split(",")
+  .map((email) => email.trim().toLowerCase())
+  .filter(Boolean);
 export const ACCESS_COOKIE = "slideroom-access-token";
 export const REFRESH_COOKIE = "slideroom-refresh-token";
 export const REFRESH_MAX_AGE = 60 * 60 * 24 * 30;
@@ -416,6 +426,27 @@ export async function requireAuthenticatedUser(request: IncomingMessage, respons
   const user = await getAuthenticatedUser(request, response);
   if (!user) throw new HttpError(401, "Not authenticated");
   return user;
+}
+
+export async function getAdminRole(user: SupabaseAuthUser) {
+  const email = user.email?.trim().toLowerCase();
+  if (email && ADMIN_EMAILS.includes(email)) return "owner";
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("app_admins")
+    .select("user_id, role, created_at")
+    .eq("user_id", user.id)
+    .maybeSingle<AppAdminRow>();
+
+  if (error) throw error;
+  return data?.role ?? null;
+}
+
+export async function requireAdminUser(request: IncomingMessage, response: ServerResponse) {
+  const user = await requireAuthenticatedUser(request, response);
+  const role = await getAdminRole(user);
+  if (!role) throw new HttpError(403, "Admin access required");
+  return { user, role };
 }
 
 function getRoomCreatedAt(room: RoomLike) {

@@ -129,6 +129,15 @@ create table if not exists public.audit_logs (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.app_admins (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  role text not null default 'admin' check (role in ('owner', 'admin', 'support')),
+  notes text,
+  created_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create index if not exists rooms_host_user_id_idx on public.rooms(host_user_id);
 create index if not exists rooms_invite_code_idx on public.rooms(invite_code);
 create index if not exists room_members_room_id_idx on public.room_members(room_id);
@@ -140,6 +149,7 @@ create index if not exists slides_file_id_idx on public.slides(file_id);
 create index if not exists exports_room_id_idx on public.exports(room_id);
 create index if not exists usage_events_user_id_created_at_idx on public.usage_events(user_id, created_at desc);
 create index if not exists audit_logs_room_id_created_at_idx on public.audit_logs(room_id, created_at desc);
+create index if not exists app_admins_role_idx on public.app_admins(role);
 
 alter table public.profiles enable row level security;
 alter table public.rooms enable row level security;
@@ -149,6 +159,12 @@ alter table public.slides enable row level security;
 alter table public.exports enable row level security;
 alter table public.usage_events enable row level security;
 alter table public.audit_logs enable row level security;
+alter table public.app_admins enable row level security;
+
+revoke all on public.app_admins from public;
+revoke all on public.app_admins from anon;
+revoke all on public.app_admins from authenticated;
+grant select, insert, update, delete on public.app_admins to service_role;
 
 create schema if not exists private;
 revoke all on schema private from public;
