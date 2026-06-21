@@ -12,6 +12,7 @@ import {
   HttpError,
   loadSharedState,
   readRequestBody,
+  recordAuditEvent,
   requireAuthenticatedUser,
   requireSameOrigin,
   sendJson,
@@ -78,6 +79,14 @@ export default async function handler(request: IncomingMessage, response: Server
         upsert: true,
       });
       if (error) throw error;
+      await recordAuditEvent(request, {
+        actorUserId: user.id,
+        roomId,
+        action: "storage.uploaded",
+        targetType: "storage_object",
+        targetId: key,
+        metadata: { size: body.length },
+      });
       sendJson(response, 200, { ok: true, key, size: body.length }, request);
       return;
     }
@@ -89,8 +98,17 @@ export default async function handler(request: IncomingMessage, response: Server
         return;
       }
 
+      const file = (state.files ?? []).find((candidate) => candidate.storageKey === key);
       const { error } = await storage.remove([key]);
       if (error) throw error;
+      await recordAuditEvent(request, {
+        actorUserId: user.id,
+        roomId: file?.roomId ?? null,
+        action: "storage.deleted",
+        targetType: "storage_object",
+        targetId: key,
+        metadata: { fileId: file?.id, size: file?.size },
+      });
       sendJson(response, 200, { ok: true }, request);
       return;
     }

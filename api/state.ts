@@ -10,6 +10,7 @@ import {
   MAX_STATE_BYTES,
   mergeAuthorizedSharedState,
   readRequestBody,
+  recordSharedStateAuditEvents,
   requireSameOrigin,
   saveSharedState,
   sendJson,
@@ -51,7 +52,9 @@ export default async function handler(request: IncomingMessage, response: Server
       const incoming = JSON.parse(body.toString("utf8"));
       const loaded = await loadSharedState();
       const current = loaded.state ?? {};
-      await saveSharedState(mergeAuthorizedSharedState(current, incoming, user.id));
+      const nextState = mergeAuthorizedSharedState(current, incoming, user.id);
+      await saveSharedState(nextState);
+      await recordSharedStateAuditEvents(request, user.id, current, nextState);
       sendJson(response, 200, { ok: true }, request);
       return;
     }

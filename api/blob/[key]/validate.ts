@@ -9,6 +9,7 @@ import {
   handleOptions,
   HttpError,
   loadSharedState,
+  recordAuditEvent,
   requireAuthenticatedUser,
   requireSameOrigin,
   sendJson,
@@ -59,6 +60,14 @@ export default async function handler(request: IncomingMessage, response: Server
       sendJson(response, 200, { ok: true, key, summary }, request);
     } catch (validationError) {
       await storage.remove([key]);
+      await recordAuditEvent(request, {
+        actorUserId: user.id,
+        roomId,
+        action: "storage.validation_failed",
+        targetType: "storage_object",
+        targetId: key,
+        metadata: { reason: validationError instanceof Error ? validationError.message : String(validationError) },
+      });
       throw validationError;
     }
   } catch (error) {

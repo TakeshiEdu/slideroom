@@ -24,6 +24,7 @@ interface FileLike {
   id?: string;
   roomId?: string;
   ownerUserId?: string;
+  name?: string;
   storageKey?: string;
   extension?: string;
   size?: number;
@@ -34,8 +35,17 @@ interface SharedAppState {
   members?: Array<{ id?: string; roomId?: string; userId?: string; role?: string; name?: string; joinedAt?: string }>;
   files?: FileLike[];
   slides?: Array<{ id?: string; roomId?: string; ownerUserId?: string; fileId?: string }>;
-  exportRecords?: Array<{ roomId?: string }>;
+  exportRecords?: Array<{ id?: string; roomId?: string; fileName?: string; format?: string; status?: string }>;
   [key: string]: unknown;
+}
+
+interface AuditEventInput {
+  actorUserId?: string | null;
+  roomId?: string | null;
+  action: string;
+  targetType?: string | null;
+  targetId?: string | null;
+  metadata?: Record<string, unknown>;
 }
 
 interface StateRow {
@@ -62,6 +72,8 @@ export const REFRESH_MAX_AGE = 60 * 60 * 24 * 30;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const MAX_ID_LENGTH = 96;
 const MAX_TEXT_LENGTH = 500;
+const MAX_AUDIT_METADATA_BYTES = 4096;
+const MAX_AUDIT_EVENTS_PER_STATE_SAVE = 50;
 const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
 
 let cachedSupabase: SupabaseClient | undefined;
@@ -277,6 +289,10 @@ function hashRateLimitKey(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
 
+function hashAuditValue(value: string) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
 export async function checkDurableRateLimit(request: IncomingMessage, scope: string, limit: number, windowMs = RATE_LIMIT_WINDOW_MS) {
   checkRateLimit(request, scope, limit, windowMs);
 
@@ -293,6 +309,54 @@ export async function checkDurableRateLimit(request: IncomingMessage, scope: str
   const result = Array.isArray(data) ? data[0] : data;
   if (!result?.allowed) {
     throw new HttpError(429, "Too many requests");
+  }
+}
+
+function cleanAuditText(value: unknown, maxLength = 240) {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed ? trimmed.slice(0, maxLength) : undefined;
+}
+
+function cleanAuditMetadata(metadata: Record<string, unknown> = {}) {
+  const cleaned = Object.fromEntries(
+    Object.entries(metadata)
+      .filter(([, value]) => value !== undefined)
+      .map(([key, value]) => [key.slice(0, 80), value]),
+  );
+  const bytes = Buffer.byteLength(JSON.stringify(cleaned), "utf8");
+  if (bytes <= MAX_AUDIT_METADATA_BYTES) return cleaned;
+  return {
+    truncated: true,
+    originalBytes: bytes,
+  };
+}
+
+export async function recordAuditEvent(request: IncomingMessage, event: AuditEventInput) {
+  try {
+    const clientIp = getClientIp(request);
+    const userAgent = cleanAuditText(request.headers["user-agent"], 500);
+    const metadata = cleanAuditMetadata({
+      ...(event.metadata ?? {}),
+      ipHash: hashAuditValue(clientIp),
+    });
+
+    const { error } = await getSupabaseAdmin()
+      .from("audit_logs")
+      .insert({
+        actor_user_id: event.actorUserId ?? null,
+        room_id: event.roomId ?? null,
+        action: event.action,
+        target_type: event.targetType ?? null,
+        target_id: event.targetId ?? null,
+        ip_address: null,
+        user_agent: userAgent ?? null,
+        metadata,
+      });
+
+    if (error) console.warn("Audit log insert skipped", error.message);
+  } catch (error) {
+    console.warn("Audit log insert skipped", error instanceof Error ? error.message : String(error));
   }
 }
 
@@ -554,6 +618,162 @@ function enforceSharedStateQuotas(state: SharedAppState, userId: string, affecte
     enforceQuota((exportsByRoom.get(roomId) ?? 0) <= MAX_EXPORT_RECORDS_PER_ROOM, "Export history limit exceeded");
     enforceQuota((bytesByRoom.get(roomId) ?? 0) <= MAX_ROOM_STORAGE_BYTES, "Room storage limit exceeded", 413);
   });
+}
+
+function indexById<T extends { id?: string }>(items: T[]) {
+  return new Map(items.filter((item) => item.id).map((item) => [item.id!, item]));
+}
+
+function roomChanged(before: RoomLike, after: RoomLike) {
+  return (
+    before.title !== after.title ||
+    before.className !== after.className ||
+    before.teamName !== after.teamName ||
+    before.description !== after.description ||
+    before.status !== after.status ||
+    before.accessMode !== after.accessMode ||
+    before.presentationAt !== after.presentationAt ||
+    before.deadlineAt !== after.deadlineAt ||
+    before.archivedAt !== after.archivedAt
+  );
+}
+
+function pushAuditEvent(events: AuditEventInput[], event: AuditEventInput) {
+  if (events.length < MAX_AUDIT_EVENTS_PER_STATE_SAVE) {
+    events.push(event);
+    return false;
+  }
+  return true;
+}
+
+export async function recordSharedStateAuditEvents(
+  request: IncomingMessage,
+  actorUserId: string,
+  before: SharedAppState,
+  after: SharedAppState,
+) {
+  const events: AuditEventInput[] = [];
+  let truncated = false;
+  const beforeRooms = indexById(toArray(before.rooms));
+  const afterRooms = indexById(toArray(after.rooms));
+  const beforeMembers = indexById(toArray(before.members));
+  const afterMembers = indexById(toArray(after.members));
+  const beforeFiles = indexById(toArray(before.files));
+  const afterFiles = indexById(toArray(after.files));
+  const beforeExports = indexById(toArray(before.exportRecords));
+  const afterExports = indexById(toArray(after.exportRecords));
+
+  afterRooms.forEach((room, roomId) => {
+    const previous = beforeRooms.get(roomId);
+    if (!previous) {
+      truncated = pushAuditEvent(events, {
+        actorUserId,
+        roomId,
+        action: "room.created",
+        targetType: "room",
+        targetId: roomId,
+        metadata: { title: room.title, accessMode: room.accessMode },
+      }) || truncated;
+    } else if (roomChanged(previous, room)) {
+      truncated = pushAuditEvent(events, {
+        actorUserId,
+        roomId,
+        action: "room.updated",
+        targetType: "room",
+        targetId: roomId,
+        metadata: { status: room.status, accessMode: room.accessMode },
+      }) || truncated;
+    }
+  });
+
+  beforeRooms.forEach((room, roomId) => {
+    if (!afterRooms.has(roomId)) {
+      truncated = pushAuditEvent(events, {
+        actorUserId,
+        roomId,
+        action: "room.deleted",
+        targetType: "room",
+        targetId: roomId,
+        metadata: { title: room.title },
+      }) || truncated;
+    }
+  });
+
+  afterMembers.forEach((member, memberId) => {
+    if (!beforeMembers.has(memberId)) {
+      truncated = pushAuditEvent(events, {
+        actorUserId,
+        roomId: member.roomId,
+        action: "member.added",
+        targetType: "member",
+        targetId: memberId,
+        metadata: { role: member.role },
+      }) || truncated;
+    }
+  });
+
+  beforeMembers.forEach((member, memberId) => {
+    if (!afterMembers.has(memberId)) {
+      truncated = pushAuditEvent(events, {
+        actorUserId,
+        roomId: member.roomId,
+        action: "member.removed",
+        targetType: "member",
+        targetId: memberId,
+        metadata: { role: member.role },
+      }) || truncated;
+    }
+  });
+
+  afterFiles.forEach((file, fileId) => {
+    if (!beforeFiles.has(fileId)) {
+      truncated = pushAuditEvent(events, {
+        actorUserId,
+        roomId: file.roomId,
+        action: "file.added",
+        targetType: "file",
+        targetId: fileId,
+        metadata: { name: file.name, size: cleanNonNegativeInteger(file.size) },
+      }) || truncated;
+    }
+  });
+
+  beforeFiles.forEach((file, fileId) => {
+    if (!afterFiles.has(fileId)) {
+      truncated = pushAuditEvent(events, {
+        actorUserId,
+        roomId: file.roomId,
+        action: "file.removed",
+        targetType: "file",
+        targetId: fileId,
+        metadata: { name: file.name, size: cleanNonNegativeInteger(file.size) },
+      }) || truncated;
+    }
+  });
+
+  afterExports.forEach((record, recordId) => {
+    if (!beforeExports.has(recordId)) {
+      truncated = pushAuditEvent(events, {
+        actorUserId,
+        roomId: record.roomId,
+        action: "export.created",
+        targetType: "export",
+        targetId: recordId,
+        metadata: { fileName: record.fileName, format: record.format, status: record.status },
+      }) || truncated;
+    }
+  });
+
+  if (truncated) {
+    events.push({
+      actorUserId,
+      action: "audit.truncated",
+      targetType: "state",
+      metadata: { maxEvents: MAX_AUDIT_EVENTS_PER_STATE_SAVE },
+    });
+  }
+
+  await Promise.all(events.map((event) => recordAuditEvent(request, event)));
 }
 
 export function canUserAccessRoom(state: SharedAppState, roomId: string, userId?: string) {
