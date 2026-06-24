@@ -1,11 +1,14 @@
 import {
+  Activity,
   ArrowDown,
   ArrowLeft,
   ArrowRight,
   ArrowUp,
+  BarChart3,
   Check,
   Clock,
   Copy,
+  Database,
   Download,
   Eye,
   EyeOff,
@@ -27,6 +30,7 @@ import {
   Save,
   Send,
   Settings,
+  Shield,
   ShieldCheck,
   Sparkles,
   Trash2,
@@ -47,6 +51,7 @@ import decorWorkflow from "./assets/decor-slide-workflow.png";
 import myroomsHeroIllustration from "./assets/myrooms-hero-illustration.png";
 import previewHero from "./assets/slide-preview-hero.png";
 import roomWorkspaceDecor from "./assets/room-workspace-decor.png";
+import { getAdminSession, loadAdminOverview, AdminApiError, type AdminOverviewResponse } from "./services/adminService";
 import { consumeAuthRedirectNotice, type AuthRedirectNotice } from "./services/authService";
 import { mergeService } from "./services/mergeService";
 import { createPptxSlidePreviewSvgs } from "./services/pptxPreviewService";
@@ -55,7 +60,7 @@ import { useAppStore } from "./stores/useAppStore";
 import type { ExportFormat, ExportSettings, Room, RoomMember, SlideItem, SubmittedFile } from "./types";
 import { formatFileSize } from "./utils/format";
 
-type AppPage = "home" | "login" | "register" | "check-email" | "forgot" | "reset-password" | "account" | "create" | "join" | "room" | "order" | "preview";
+type AppPage = "home" | "login" | "register" | "check-email" | "forgot" | "reset-password" | "account" | "admin" | "create" | "join" | "room" | "order" | "preview";
 
 interface AppRoute {
   page: AppPage;
@@ -78,6 +83,7 @@ function parseHash(): AppRoute {
   if (parts[0] === "forgot") return { page: "forgot" };
   if (parts[0] === "reset-password") return { page: "reset-password" };
   if (parts[0] === "account") return { page: "account" };
+  if (parts[0] === "admin") return { page: "admin" };
   if (parts[0] === "create") return { page: "create" };
   if (parts[0] === "join") return { page: "join", inviteCode: parts[1] };
   if (parts[0] === "room" && parts[1] && parts[2] === "order") return { page: "order", roomId: parts[1] };
@@ -137,6 +143,7 @@ function App() {
       {route.page === "forgot" && <ForgotPasswordPage />}
       {route.page === "reset-password" && <ResetPasswordPage />}
       {route.page === "account" && (authReady && isAuthenticated ? <AccountPage /> : <LoginPage />)}
+      {route.page === "admin" && (authReady && isAuthenticated ? <AdminPage /> : <LoginPage />)}
       {route.page === "create" && (authReady && isAuthenticated ? <CreateRoomPage /> : <RegisterPage />)}
       {route.page === "join" && <JoinRoomPage inviteCode={route.inviteCode} />}
       {route.page === "room" && (routeRoom ? <RoomPage room={routeRoom} /> : <NotFoundPage />)}
@@ -708,7 +715,7 @@ function MyRoomsPage() {
   );
 }
 
-function AppTopNav({ active, onLogout }: { active: "rooms" | "account"; onLogout?: () => void }) {
+function AppTopNav({ active, onLogout }: { active: "rooms" | "account" | "admin"; onLogout?: () => void }) {
   return (
     <header className="app-top-nav">
       <BrandMini />
@@ -719,11 +726,46 @@ function AppTopNav({ active, onLogout }: { active: "rooms" | "account"; onLogout
         <button className={cx(active === "account" && "is-active")} type="button" onClick={() => navigate("/account")}>
           <User size={22} /> アカウント
         </button>
+        <AdminNavButton active={active === "admin"} />
       </nav>
       <button className="top-icon-button" type="button" onClick={onLogout ?? (() => navigate("/account"))} aria-label={onLogout ? "ログアウト" : "アカウント設定"}>
         {onLogout ? <LogOut size={22} /> : <Settings size={22} />}
       </button>
     </header>
+  );
+}
+
+function AdminNavButton({ active }: { active: boolean }) {
+  const [visible, setVisible] = useState(active);
+
+  useEffect(() => {
+    let alive = true;
+    if (active) {
+      setVisible(true);
+      return () => {
+        alive = false;
+      };
+    }
+
+    getAdminSession()
+      .then((session) => {
+        if (alive) setVisible(Boolean(session));
+      })
+      .catch(() => {
+        if (alive) setVisible(false);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [active]);
+
+  if (!visible) return null;
+
+  return (
+    <button className={cx(active && "is-active")} type="button" onClick={() => navigate("/admin")}>
+      <Shield size={22} /> 管理
+    </button>
   );
 }
 
@@ -996,6 +1038,209 @@ function AccountPage() {
       </section>
     </main>
   );
+}
+
+function AdminPage() {
+  const [overview, setOverview] = useState<AdminOverviewResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<{ status?: number; message: string } | null>(null);
+
+  async function refresh() {
+    setLoading(true);
+    setError(null);
+    try {
+      setOverview(await loadAdminOverview());
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "管理情報を読み込めませんでした。";
+      setError({
+        status: caught instanceof AdminApiError ? caught.status : undefined,
+        message,
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void refresh();
+  }, []);
+
+  const totals = overview?.summary.totals;
+
+  return (
+    <main className="myrooms-page">
+      <section className="dashboard-shell admin-dashboard">
+        <AppTopNav active="admin" />
+        <section className="admin-panel">
+          <div className="admin-hero">
+            <div>
+              <span className="admin-kicker"><Shield size={18} /> 運用管理</span>
+              <h1>SlideRoom 管理</h1>
+              <p>本番運用で必要な利用状況、監査ログ、制限値を確認できます。</p>
+            </div>
+            <button className="secondary-action admin-refresh-button" type="button" onClick={() => void refresh()} disabled={loading}>
+              <Activity size={20} /> {loading ? "更新中..." : "再読み込み"}
+            </button>
+          </div>
+
+          {loading && (
+            <section className="admin-state-card" aria-live="polite">
+              <span className="admin-loading-ring" />
+              <strong>管理情報を読み込んでいます</strong>
+              <p>ルーム、アップロード、監査ログを集計中です。</p>
+            </section>
+          )}
+
+          {!loading && error && (
+            <section className="admin-state-card is-error">
+              <ShieldCheck size={42} />
+              <strong>{error.status === 403 ? "管理者権限が必要です" : "管理情報を読み込めませんでした"}</strong>
+              <p>{error.status === 403 ? "この画面は app_admins または SLIDEROOM_ADMIN_EMAILS で許可されたユーザーだけが利用できます。" : error.message}</p>
+              <button className="outline-create-button" type="button" onClick={() => navigate("/account")}>アカウントへ戻る</button>
+            </section>
+          )}
+
+          {!loading && overview && totals && (
+            <>
+              <div className="admin-stat-grid">
+                <AdminStatCard icon={<Database size={24} />} label="ルーム" value={totals.rooms} tone="blue" />
+                <AdminStatCard icon={<Users size={24} />} label="メンバー" value={totals.members} tone="green" />
+                <AdminStatCard icon={<FileText size={24} />} label="ファイル" value={totals.files} tone="mint" />
+                <AdminStatCard icon={<ListOrdered size={24} />} label="スライド" value={totals.slides} tone="blue" />
+                <AdminStatCard icon={<Download size={24} />} label="出力履歴" value={totals.exportRecords} tone="green" />
+                <AdminStatCard icon={<Clock size={24} />} label="期限超過候補" value={totals.expiredRoomCandidates} tone="warning" />
+              </div>
+
+              <div className="admin-content-grid">
+                <section className="admin-card">
+                  <div className="admin-card-title">
+                    <BarChart3 size={22} />
+                    <h2>状態別ルーム</h2>
+                  </div>
+                  <div className="admin-chip-list">
+                    {Object.entries(overview.summary.roomsByStatus).map(([key, value]) => (
+                      <span key={key}><b>{key}</b>{value}</span>
+                    ))}
+                  </div>
+                  <div className="admin-chip-list">
+                    {Object.entries(overview.summary.roomsByAccessMode).map(([key, value]) => (
+                      <span key={key}><b>{key}</b>{value}</span>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="admin-card">
+                  <div className="admin-card-title">
+                    <Database size={22} />
+                    <h2>制限値</h2>
+                  </div>
+                  <dl className="admin-limit-list">
+                    <div><dt>アップロード上限</dt><dd>{formatAdminLimit("maxUploadBytes", overview.limits.maxUploadBytes)}</dd></div>
+                    <div><dt>ルーム容量</dt><dd>{formatAdminLimit("maxRoomStorageBytes", overview.limits.maxRoomStorageBytes)}</dd></div>
+                    <div><dt>状態サイズ</dt><dd>{formatAdminLimit("maxStateBytes", overview.limits.maxStateBytes)}</dd></div>
+                    <div><dt>ルーム期限</dt><dd>{overview.limits.roomTtlHours}時間</dd></div>
+                    <div><dt>ユーザー別ルーム</dt><dd>{overview.limits.maxRoomsPerUser}件</dd></div>
+                    <div><dt>ルーム別ファイル</dt><dd>{overview.limits.maxFilesPerRoom}件</dd></div>
+                  </dl>
+                </section>
+              </div>
+
+              <section className="admin-card admin-wide-card">
+                <div className="admin-card-title">
+                  <FileText size={22} />
+                  <h2>負荷が大きいルーム</h2>
+                </div>
+                <div className="admin-room-table">
+                  {overview.summary.largestRooms.length > 0 ? overview.summary.largestRooms.map((room) => (
+                    <button key={room.id ?? room.title} type="button" onClick={() => room.id && navigate(`/room/${room.id}`)}>
+                      <span>
+                        <strong>{room.title || room.id || "Untitled room"}</strong>
+                        <small>{room.status ?? "unknown"} / {room.accessMode ?? "invite"} / 更新 {formatAdminTimestamp(room.updatedAt)}</small>
+                      </span>
+                      <em>{room.files} files</em>
+                      <em>{room.slides} slides</em>
+                      <em>{room.members} members</em>
+                      <ArrowRight size={20} />
+                    </button>
+                  )) : (
+                    <p className="admin-empty-text">ルームはまだありません。</p>
+                  )}
+                </div>
+              </section>
+
+              <div className="admin-content-grid">
+                <AdminEventCard title="最近の監査ログ" records={overview.recentAuditLogs} primaryKey="action" secondaryKey="target_type" />
+                <AdminEventCard title="最近の利用イベント" records={overview.recentUsageEvents} primaryKey="event_type" secondaryKey="room_id" />
+              </div>
+
+              <p className="admin-footnote">
+                管理者: {overview.admin.email ?? overview.admin.id} / role: {overview.admin.role} / storage: {formatFileSize(totals.storageBytes)}
+              </p>
+            </>
+          )}
+        </section>
+      </section>
+    </main>
+  );
+}
+
+function AdminStatCard({ icon, label, value, tone }: { icon: ReactNode; label: string; value: number; tone: "blue" | "green" | "mint" | "warning" }) {
+  return (
+    <section className={cx("admin-stat-card", `is-${tone}`)}>
+      <span>{icon}</span>
+      <div>
+        <strong>{new Intl.NumberFormat("ja-JP").format(value)}</strong>
+        <small>{label}</small>
+      </div>
+    </section>
+  );
+}
+
+function AdminEventCard({ title, records, primaryKey, secondaryKey }: { title: string; records: Array<Record<string, unknown>>; primaryKey: string; secondaryKey: string }) {
+  return (
+    <section className="admin-card">
+      <div className="admin-card-title">
+        <Activity size={22} />
+        <h2>{title}</h2>
+      </div>
+      <div className="admin-event-list">
+        {records.length > 0 ? records.slice(0, 8).map((record, index) => (
+          <article key={`${title}-${index}`}>
+            <strong>{adminRecordText(record, primaryKey) || "event"}</strong>
+            <span>{adminRecordText(record, secondaryKey) || adminRecordText(record, "room_id") || "system"}</span>
+            <small>{formatAdminTimestamp(adminRecordText(record, "created_at"))}</small>
+          </article>
+        )) : (
+          <p className="admin-empty-text">まだ記録がありません。</p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function adminRecordText(record: Record<string, unknown>, key: string) {
+  const value = record[key];
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return "";
+}
+
+function formatAdminTimestamp(value?: string) {
+  if (!value) return "不明";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "不明";
+  return new Intl.DateTimeFormat("ja-JP", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function formatAdminLimit(key: string, value: number) {
+  if (key.toLowerCase().includes("bytes")) return formatFileSize(value);
+  return new Intl.NumberFormat("ja-JP").format(value);
 }
 
 function MyRoomCard({ room, iconIndex, thumbnailSvg }: { room: Room; iconIndex: number; thumbnailSvg?: string }) {
