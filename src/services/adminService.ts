@@ -88,3 +88,19 @@ export function getAdminSession() {
 export function loadAdminOverview() {
   return adminFetch<AdminOverviewResponse>("overview");
 }
+
+export function deleteAdminRoom(roomId: string, reason?: string) {
+  return fetch(`/api/admin/rooms/${encodeURIComponent(roomId)}`, {
+    method: "DELETE",
+    cache: "no-store",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reason }),
+  }).then(async (response) => {
+    const payload = await response.json().catch(() => null) as { error?: string } | null;
+    if (!response.ok) {
+      throw new AdminApiError(response.status, payload?.error || `Admin API error: ${response.status}`);
+    }
+    return payload as { ok: true; room: { id: string; title?: string }; storage?: { attempted: number; removed: number } };
+  });
+}

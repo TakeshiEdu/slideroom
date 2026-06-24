@@ -51,7 +51,7 @@ import decorWorkflow from "./assets/decor-slide-workflow.png";
 import myroomsHeroIllustration from "./assets/myrooms-hero-illustration.png";
 import previewHero from "./assets/slide-preview-hero.png";
 import roomWorkspaceDecor from "./assets/room-workspace-decor.png";
-import { getAdminSession, loadAdminOverview, AdminApiError, type AdminOverviewResponse } from "./services/adminService";
+import { deleteAdminRoom, getAdminSession, loadAdminOverview, AdminApiError, type AdminOverviewResponse, type AdminRoomSummary } from "./services/adminService";
 import { consumeAuthRedirectNotice, type AuthRedirectNotice } from "./services/authService";
 import { mergeService } from "./services/mergeService";
 import { createPptxSlidePreviewSvgs } from "./services/pptxPreviewService";
@@ -1045,6 +1045,10 @@ function AdminPage() {
   const [overview, setOverview] = useState<AdminOverviewResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<{ status?: number; message: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AdminRoomSummary | null>(null);
+  const [deleteReason, setDeleteReason] = useState("");
+  const [confirmTitle, setConfirmTitle] = useState("");
+  const [deletingRoomId, setDeletingRoomId] = useState<string | null>(null);
 
   async function refresh() {
     setLoading(true);
@@ -1090,6 +1094,34 @@ function AdminPage() {
   }, []);
 
   const totals = overview?.summary.totals;
+  const deleteConfirmation = deleteTarget?.title || deleteTarget?.id || "";
+
+  function openDeleteDialog(room: AdminRoomSummary) {
+    setDeleteTarget(room);
+    setDeleteReason("");
+    setConfirmTitle("");
+  }
+
+  async function confirmDeleteRoom(event: FormEvent) {
+    event.preventDefault();
+    if (!deleteTarget?.id) return;
+    if (confirmTitle.trim() !== deleteConfirmation) {
+      toast.error("確認テキストが一致していません。");
+      return;
+    }
+
+    setDeletingRoomId(deleteTarget.id);
+    try {
+      await deleteAdminRoom(deleteTarget.id, deleteReason.trim());
+      toast.success("ルームを削除しました。");
+      setDeleteTarget(null);
+      await refresh();
+    } catch (caught) {
+      toast.error(caught instanceof Error ? caught.message : "ルームを削除できませんでした。");
+    } finally {
+      setDeletingRoomId(null);
+    }
+  }
 
   return (
     <main className="myrooms-page">
@@ -1176,7 +1208,7 @@ function AdminPage() {
                 </div>
                 <div className="admin-room-table">
                   {overview.summary.largestRooms.length > 0 ? overview.summary.largestRooms.map((room) => (
-                    <button key={room.id ?? room.title} type="button" onClick={() => room.id && navigate(`/room/${room.id}`)}>
+                    <article className="admin-room-row" key={room.id ?? room.title}>
                       <span>
                         <strong>{room.title || room.id || "Untitled room"}</strong>
                         <small>{room.status ?? "unknown"} / {room.accessMode ?? "invite"} / 更新 {formatAdminTimestamp(room.updatedAt)}</small>
@@ -1184,8 +1216,13 @@ function AdminPage() {
                       <em>{room.files} files</em>
                       <em>{room.slides} slides</em>
                       <em>{room.members} members</em>
-                      <ArrowRight size={20} />
-                    </button>
+                      <button className="admin-room-open" type="button" onClick={() => room.id && navigate(`/room/${room.id}`)} disabled={!room.id}>
+                        <ArrowRight size={20} />
+                      </button>
+                      <button className="admin-room-delete" type="button" onClick={() => openDeleteDialog(room)} disabled={!room.id || deletingRoomId === room.id}>
+                        <Trash2 size={18} /> 削除
+                      </button>
+                    </article>
                   )) : (
                     <p className="admin-empty-text">ルームはまだありません。</p>
                   )}
@@ -1203,6 +1240,35 @@ function AdminPage() {
             </>
           )}
         </section>
+
+        {deleteTarget && (
+          <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="管理者ルーム削除">
+            <form className="account-edit-modal admin-delete-modal" onSubmit={confirmDeleteRoom}>
+              <button className="modal-close" type="button" onClick={() => setDeleteTarget(null)} aria-label="閉じる" disabled={Boolean(deletingRoomId)}>
+                <X size={22} />
+              </button>
+              <h2>ルームを削除</h2>
+              <p className="account-card-help">
+                ルーム、参加者、アップロードファイル、スライド、出力履歴を削除します。復元できません。
+              </p>
+              <div className="admin-delete-summary">
+                <strong>{deleteTarget.title || deleteTarget.id}</strong>
+                <span>{deleteTarget.files} files / {deleteTarget.slides} slides / {deleteTarget.members} members</span>
+              </div>
+              <label className="auth-field">
+                <span>削除理由</span>
+                <input value={deleteReason} onChange={(event) => setDeleteReason(event.target.value)} placeholder="例: 不適切なデータのため" />
+              </label>
+              <label className="auth-field">
+                <span>確認のため「{deleteConfirmation}」と入力</span>
+                <input value={confirmTitle} onChange={(event) => setConfirmTitle(event.target.value)} placeholder={deleteConfirmation} />
+              </label>
+              <button className="wide-primary danger-primary" type="submit" disabled={Boolean(deletingRoomId) || confirmTitle.trim() !== deleteConfirmation}>
+                {deletingRoomId ? "削除中..." : "完全に削除する"}
+              </button>
+            </form>
+          </div>
+        )}
       </section>
     </main>
   );
