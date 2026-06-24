@@ -83,7 +83,8 @@ function parseHash(): AppRoute {
   if (parts[0] === "forgot") return { page: "forgot" };
   if (parts[0] === "reset-password") return { page: "reset-password" };
   if (parts[0] === "account") return { page: "account" };
-  if (parts[0] === "admin") return { page: "admin" };
+  if (parts[0] === "admin" && parts.length === 1) return { page: "admin" };
+  if (parts[0] === "admin") return { page: "home" };
   if (parts[0] === "create") return { page: "create" };
   if (parts[0] === "join") return { page: "join", inviteCode: parts[1] };
   if (parts[0] === "room" && parts[1] && parts[2] === "order") return { page: "order", roomId: parts[1] };
@@ -1051,6 +1052,10 @@ function AdminPage() {
     try {
       setOverview(await loadAdminOverview());
     } catch (caught) {
+      if (caught instanceof AdminApiError && (caught.status === 401 || caught.status === 403)) {
+        navigate("/");
+        return;
+      }
       const message = caught instanceof Error ? caught.message : "管理情報を読み込めませんでした。";
       setError({
         status: caught instanceof AdminApiError ? caught.status : undefined,
@@ -1062,7 +1067,26 @@ function AdminPage() {
   }
 
   useEffect(() => {
-    void refresh();
+    let alive = true;
+    setLoading(true);
+    setError(null);
+
+    getAdminSession()
+      .then((session) => {
+        if (!alive) return;
+        if (!session) {
+          navigate("/");
+          return;
+        }
+        void refresh();
+      })
+      .catch(() => {
+        if (alive) navigate("/");
+      });
+
+    return () => {
+      alive = false;
+    };
   }, []);
 
   const totals = overview?.summary.totals;
@@ -1094,8 +1118,8 @@ function AdminPage() {
           {!loading && error && (
             <section className="admin-state-card is-error">
               <ShieldCheck size={42} />
-              <strong>{error.status === 403 ? "管理者権限が必要です" : "管理情報を読み込めませんでした"}</strong>
-              <p>{error.status === 403 ? "この画面は app_admins または SLIDEROOM_ADMIN_EMAILS で許可されたユーザーだけが利用できます。" : error.message}</p>
+              <strong>管理情報を読み込めませんでした</strong>
+              <p>{error.message}</p>
               <button className="outline-create-button" type="button" onClick={() => navigate("/account")}>アカウントへ戻る</button>
             </section>
           )}
