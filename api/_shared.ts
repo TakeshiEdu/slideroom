@@ -63,14 +63,19 @@ export const ROOM_TTL_HOURS = Number(process.env.SLIDEROOM_ROOM_TTL_HOURS ?? "24
 export const ROOM_TTL_MS = ROOM_TTL_HOURS * 60 * 60 * 1000;
 export const STATE_ID = process.env.SLIDEROOM_STATE_ID ?? "global-dev";
 export const STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET ?? "slideroom-uploads";
-export const MAX_UPLOAD_BYTES = Number(process.env.SLIDEROOM_MAX_UPLOAD_BYTES ?? 300 * 1024 * 1024);
+function minimumNumber(raw: string | undefined, minimum: number) {
+  const value = Number(raw);
+  return Number.isFinite(value) ? Math.max(value, minimum) : minimum;
+}
+
+export const MAX_UPLOAD_BYTES = minimumNumber(process.env.SLIDEROOM_MAX_UPLOAD_BYTES, 500 * 1024 * 1024);
 export const MAX_STATE_BYTES = 1024 * 1024;
 export const MAX_ROOMS_PER_USER = Number(process.env.SLIDEROOM_MAX_ROOMS_PER_USER ?? "20");
 export const MAX_MEMBERS_PER_ROOM = Number(process.env.SLIDEROOM_MAX_MEMBERS_PER_ROOM ?? "100");
-export const MAX_FILES_PER_ROOM = Number(process.env.SLIDEROOM_MAX_FILES_PER_ROOM ?? "60");
-export const MAX_SLIDES_PER_ROOM = Number(process.env.SLIDEROOM_MAX_SLIDES_PER_ROOM ?? "500");
+export const MAX_FILES_PER_ROOM = minimumNumber(process.env.SLIDEROOM_MAX_FILES_PER_ROOM, 100);
+export const MAX_SLIDES_PER_ROOM = minimumNumber(process.env.SLIDEROOM_MAX_SLIDES_PER_ROOM, 1500);
 export const MAX_EXPORT_RECORDS_PER_ROOM = Number(process.env.SLIDEROOM_MAX_EXPORT_RECORDS_PER_ROOM ?? "30");
-export const MAX_ROOM_STORAGE_BYTES = Number(process.env.SLIDEROOM_MAX_ROOM_STORAGE_BYTES ?? 1024 * 1024 * 1024);
+export const MAX_ROOM_STORAGE_BYTES = minimumNumber(process.env.SLIDEROOM_MAX_ROOM_STORAGE_BYTES, 3 * 1024 * 1024 * 1024);
 export const ADMIN_EMAILS = (process.env.SLIDEROOM_ADMIN_EMAILS ?? "")
   .split(",")
   .map((email) => email.trim().toLowerCase())

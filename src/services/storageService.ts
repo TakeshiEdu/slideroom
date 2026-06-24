@@ -34,7 +34,7 @@ function getBrowserSupabase() {
 
 async function requestSignedUpload(storageKey: string, roomId: string) {
   if (!canUseServerStorage()) return undefined;
-  if (import.meta.env.VITE_ENABLE_SIGNED_UPLOADS !== "true") return undefined;
+  if (import.meta.env.VITE_ENABLE_SIGNED_UPLOADS === "false") return undefined;
   const params = new URLSearchParams({ roomId });
   const response = await fetch(`/api/blob/${encodeURIComponent(storageKey)}/upload-url?${params.toString()}`, { method: "POST" });
   if (!response.ok) return undefined;

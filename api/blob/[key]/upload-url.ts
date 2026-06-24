@@ -23,7 +23,7 @@ export default async function handler(request: IncomingMessage, response: Server
     return;
   }
 
-  if (process.env.SLIDEROOM_ENABLE_SIGNED_UPLOADS !== "true") {
+  if (process.env.SLIDEROOM_ENABLE_SIGNED_UPLOADS === "false") {
     sendJson(response, 404, { ok: false, error: "Signed uploads are disabled" }, request);
     return;
   }

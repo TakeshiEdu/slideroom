@@ -1,7 +1,7 @@
 import type { ValidationResult } from "../types";
 
 export const ALLOWED_EXTENSIONS = ["pptx"];
-export const MAX_UPLOAD_BYTES = 200 * 1024 * 1024;
+export const MAX_UPLOAD_BYTES = 500 * 1024 * 1024;
 
 export function getExtension(fileName: string) {
   const part = fileName.split(".").pop()?.toLowerCase();
@@ -19,7 +19,7 @@ export function validateUploadFile(file: File): ValidationResult {
   }
 
   if (file.size > MAX_UPLOAD_BYTES) {
-    return { valid: false, message: "ファイルサイズは200MB以下にしてください。" };
+    return { valid: false, message: "ファイルサイズは500MB以下にしてください。" };
   }
 
   return { valid: true };
@@ -41,7 +41,7 @@ export function inferSlideCount(fileName: string, extension: string) {
   const hit = Object.entries(known).find(([keyword]) => lowerName.includes(keyword));
   if (hit) return hit[1];
   if (extension === "pdf") return 4;
-  if (extension === "pptx" || extension === "ppt") return 3;
+  if (extension === "pptx" || extension === "ppt") return 1;
   return 1;
 }
 
